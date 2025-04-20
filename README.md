@@ -36,6 +36,7 @@ scripts/        # Training scripts and utilities
 ```bash
 git clone https://github.com/yourusername/symbolcast.git
 cd symbolcast
+```
 
 2. Build with CMake
 
