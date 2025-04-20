@@ -55,9 +55,9 @@ make
 ---
 
 ### 🧪 Training a Model
-	1.	Draw and label symbols via the app
-	2.	Export the dataset to data/labeled/
-	3.	Run training script:
+1. Draw and label symbols via the app
+2. Export the dataset to data/labeled/
+3. Run training script:
 
 ```bash
 cd scripts/training
