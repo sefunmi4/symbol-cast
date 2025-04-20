@@ -18,13 +18,13 @@ Designed to feel like a native extension of the OS, SymbolCast supports both 2D 
 ---
 
 ## 🧱 Architecture Overview
-
+```bash
 apps/           # Desktop and VR apps
 core/           # Core logic for input, symbol recognition, command mapping
 data/           # Symbol dataset (raw, labeled, and processed)
 models/         # Trained ML models (ONNX, TFLite)
 scripts/        # Training scripts and utilities
-
+```
 ---
 
 ## 🚀 Quick Start
