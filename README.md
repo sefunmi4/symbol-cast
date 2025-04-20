@@ -38,64 +38,67 @@ git clone https://github.com/yourusername/symbolcast.git
 cd symbolcast
 ```
 
-2. Build with CMake
+### 2. Build with CMake
 
+```bash
 mkdir build && cd build
 cmake ..
 make
+```
 
-3. Run the desktop app
-
+### 3. Run the desktop app
+```bash
 ./symbolcast-desktop
+```
 
 
+---
 
-⸻
-
-🧪 Training a Model
+### 🧪 Training a Model
 	1.	Draw and label symbols via the app
 	2.	Export the dataset to data/labeled/
 	3.	Run training script:
 
+```bash
 cd scripts/training
 python train_symbol_model.py --data_dir ../../data/labeled --output_model ../../models/symbolcast-v1.onnx
+```
 
 
+---
 
-⸻
+### 📦 Dependencies
+- C++17 or later
+- Qt 6+ (for GUI)
+- OpenXR / SteamVR (for VR support)
+- ONNX Runtime (for model inference)
+- Python (for training scripts)
 
-📦 Dependencies
-	•	C++17 or later
-	•	Qt 6+ (for GUI)
-	•	OpenXR / SteamVR (for VR support)
-	•	ONNX Runtime (for model inference)
-	•	Python (for training scripts)
+---
 
-⸻
+### 🗺️ Roadmap
+- Input capture (mouse, trackpad, keyboard)
+- Symbol recording + labeling
+- Dataset export + augmentation
+- Model training and inference
+- VR input drawing (OpenXR)
+- Real-time gesture-to-command mapping
+- EtherOS integration as system-level service
 
-🗺️ Roadmap
-	•	Input capture (mouse, trackpad, keyboard)
-	•	Symbol recording + labeling
-	•	Dataset export + augmentation
-	•	Model training and inference
-	•	VR input drawing (OpenXR)
-	•	Real-time gesture-to-command mapping
-	•	EtherOS integration as system-level service
+---
 
-⸻
-
-🤝 Contributing
+### 🤝 Contributing
 
 Pull requests are welcome! For major changes, please open an issue to discuss what you’d like to add or improve.
 
-⸻
+---
 
-📜 License
+### 📜 License
 
 This project is licensed under the MIT License.
 
-⸻
+---
 
-🌌 Vision
+### 🌌 Vision
 
 SymbolCast is more than an input engine — it’s a step toward a world where users interact with their OS like spellcasters, using gestures, voice, and intention. Whether on a desktop or in virtual reality, SymbolCast reimagines computing as a symbolic dialogue between human and machine.
