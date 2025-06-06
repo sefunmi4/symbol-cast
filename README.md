@@ -51,6 +51,12 @@ make
 ./symbolcast-desktop
 ```
 
+### Build and run the VR app
+```bash
+make symbolcast-vr
+./symbolcast-vr
+```
+
 
 ---
 
