@@ -14,11 +14,17 @@ public:
         return true;
     }
 
-    // Returns a dummy command string for now.
+    // Returns the predicted symbol name (dummy implementation).
     std::string run(const std::vector<Point>& points) {
         if (points.empty()) return "";
         // Real inference would happen here.
-        return "dummy-command";
+        return points.size() > 2 ? "triangle" : "dot";
+    }
+
+    std::string commandForSymbol(const std::string& symbol) const {
+        if (symbol == "triangle") return "open-settings";
+        if (symbol == "dot") return "click";
+        return "";
     }
 
     const std::string& modelPath() const { return m_modelPath; }

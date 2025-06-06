@@ -51,6 +51,10 @@ make
 ./symbolcast-desktop
 ```
 
+The MVP demo starts capturing after a simulated double tap, plays back the drawn
+gesture path in the console, prints the predicted symbol, and shows the mapped
+command.
+
 ### Build and run the VR app
 ```bash
 make symbolcast-vr
