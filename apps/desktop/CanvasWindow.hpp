@@ -8,6 +8,9 @@
 #include <QPainter>
 #include <QTimer>
 #include <QDateTime>
+#include <QShortcut>
+#include <QKeySequence>
+#include <QCoreApplication>
 #include <algorithm>
 #include <vector>
 #include "core/input/InputManager.hpp"
@@ -24,6 +27,11 @@ public:
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
         setMouseTracking(true);
         setCursor(Qt::BlankCursor);
+        // allow quick exit with Esc or Ctrl+C
+        m_exitEsc = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+        connect(m_exitEsc, &QShortcut::activated, qApp, &QCoreApplication::quit);
+        m_exitCtrlC = new QShortcut(QKeySequence(QStringLiteral("Ctrl+C")), this);
+        connect(m_exitCtrlC, &QShortcut::activated, qApp, &QCoreApplication::quit);
         int w = qEnvironmentVariableIntValue("SC_TRACKPAD_WIDTH");
         int h = qEnvironmentVariableIntValue("SC_TRACKPAD_HEIGHT");
         if (w <= 0) w = 400;
@@ -145,6 +153,8 @@ private:
     bool m_fading;
     std::vector<Ripple> m_ripples;
     QTimer* m_timer;
+    QShortcut* m_exitEsc;
+    QShortcut* m_exitCtrlC;
 };
 
 #endif // CANVASWINDOW_HPP

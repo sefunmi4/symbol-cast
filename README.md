@@ -54,7 +54,7 @@ make
 ./symbolcast-desktop
 ```
 
-An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
+An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition. Press **Esc** or **Ctrl+C** at any time to exit.
 
 
 ### Build and run the VR app
