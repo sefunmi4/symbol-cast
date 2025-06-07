@@ -4,11 +4,13 @@
 #include <chrono>
 #include <thread>
 
+// TODO: provide real-time UI for desktop gesture capture
+
 int main() {
     sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");
     sc::InputManager input;
     sc::ModelRunner model;
-    model.loadModel("models/lite/symbolcast-v1.onnx");
+    model.loadModel("models/symbolcast-v1.onnx");
 
     // Simulated double tap to begin capture
     input.onTap(0);
