@@ -32,7 +32,6 @@ public:
             out << p.x << ',' << p.y << ',' << p.z << '\n';
         }
     }
-  
 private:
     bool m_capturing;
     std::vector<Point3D> m_points;

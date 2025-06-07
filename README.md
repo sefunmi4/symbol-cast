@@ -54,7 +54,8 @@ make
 ./symbolcast-desktop
 ```
 
-An overlay window will appear on the desktop. Use your trackpad or mouse to draw a symbol and press **Submit**. The predicted symbol is printed in the console.
+An overlay window sized to your trackpad will appear. Set environment variables `SC_TRACKPAD_WIDTH` and `SC_TRACKPAD_HEIGHT` (in pixels) to match your device. Tap the trackpad to see ripples, double tap to start drawing, then double tap again to submit your glowing trace for recognition.
+
 
 ### Build and run the VR app
 ```bash
