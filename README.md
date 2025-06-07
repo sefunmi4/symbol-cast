@@ -54,8 +54,7 @@ make
 ./symbolcast-desktop
 ```
 
-The MVP demo starts capturing after a simulated double tap, plays back the drawn
-gesture path in the console, and prints the predicted symbol.
+An overlay window will appear on the desktop. Use your trackpad or mouse to draw a symbol and press **Submit**. The predicted symbol is printed in the console.
 
 ### Build and run the VR app
 ```bash
@@ -86,6 +85,15 @@ cd scripts/training
 python train_symbol_model.py \
     --data_dir ../../data/labeled \
     --output_model ../../models/symbolcast-v1.onnx
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
 ```
 The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
 version control).

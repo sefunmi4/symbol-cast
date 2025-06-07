@@ -1,31 +1,11 @@
-#include "core/input/InputManager.hpp"
-#include "core/recognition/ModelRunner.hpp"
+#include <QApplication>
+#include "CanvasWindow.hpp"
 #include "utils/Logger.hpp"
-#include <chrono>
-#include <thread>
 
-// TODO: provide real-time UI for desktop gesture capture
-
-int main() {
+int main(int argc, char** argv) {
+    QApplication app(argc, argv);
     sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");
-    sc::InputManager input;
-    sc::ModelRunner model;
-    model.loadModel("models/symbolcast-v1.onnx");
-
-    // Simulated double tap to begin capture
-    input.onTap(0);
-    input.onTap(100);
-
-    // Simulated gesture points forming a triangle
-    input.addPoint(0.f, 0.f);
-    input.addPoint(0.5f, 1.f);
-    input.addPoint(1.f, 0.f);
-    input.stopCapture();
-
-    sc::log(sc::LogLevel::Info, "Playing back captured path:");
-    input.playbackPath();
-
-    auto symbol = model.run(input.points());
-    sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + symbol);
-    return 0;
+    CanvasWindow win;
+    win.show();
+    return app.exec();
 }

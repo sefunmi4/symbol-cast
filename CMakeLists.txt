@@ -3,6 +3,7 @@ project(SymbolCast LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
 
 # Core library (header-only)
 add_library(symbolcast_core INTERFACE)
@@ -21,8 +22,12 @@ if(SC_USE_ONNXRUNTIME)
 endif()
 
 # Desktop application
-add_executable(symbolcast-desktop apps/desktop/main.cpp)
-target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
+
+add_executable(symbolcast-desktop
+    apps/desktop/main.cpp
+    apps/desktop/CanvasWindow.hpp)
+target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core Qt5::Widgets)
 
 # VR application
 add_executable(symbolcast-vr apps/vr/main.cpp)

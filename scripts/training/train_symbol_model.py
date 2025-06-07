@@ -8,8 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
-# TODO: add data augmentation and cross-validation
 
+# TODO: add data augmentation and cross-validation
 
 def main():
     parser = argparse.ArgumentParser(description="Train symbol recognition model")
