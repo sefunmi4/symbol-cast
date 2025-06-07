@@ -35,6 +35,7 @@ public:
                 stopCapture();
             else
                 startCapture();
+
             m_lastTap = std::numeric_limits<uint64_t>::max();
             return true;
         }

@@ -56,6 +56,7 @@ make
 
 An overlay window sized to your trackpad will appear. Set environment variables `SC_TRACKPAD_WIDTH` and `SC_TRACKPAD_HEIGHT` (in pixels) to match your device. Tap the trackpad to see ripples, double tap to start drawing, then double tap again to submit your glowing trace for recognition.
 
+
 ### Build and run the VR app
 ```bash
 make symbolcast-vr
@@ -95,6 +96,18 @@ You can split the labeled dataset into training and test sets with
 ```bash
 python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
 ```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
+
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
 
 
 ---
