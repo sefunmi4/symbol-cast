@@ -56,6 +56,7 @@ make
 
 An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
 
+
 ### Build and run the VR app
 ```bash
 make symbolcast-vr
@@ -95,6 +96,18 @@ You can split the labeled dataset into training and test sets with
 ```bash
 python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
 ```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
+
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
 
 
 ---
