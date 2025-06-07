@@ -50,5 +50,6 @@ def main():
         f.write(onnx_model.SerializeToString())
     print(f"Wrote ONNX model with {len(samples)} samples to {output}")
 
+
 if __name__ == "__main__":
     main()

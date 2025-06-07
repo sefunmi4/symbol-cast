@@ -57,6 +57,7 @@ public:
         }
 #endif
         return points.size() > 3 ? "square" : (points.size() > 2 ? "triangle" : "dot");
+
     }
 
     std::string commandForSymbol(const std::string& symbol) const {
