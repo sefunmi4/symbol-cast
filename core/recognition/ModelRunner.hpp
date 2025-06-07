@@ -7,6 +7,11 @@
 #  include <onnxruntime_cxx_api.h>
 #endif
 
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
 namespace sc {
 
 // Stub model runner for loading and running gesture recognition models.
@@ -57,7 +62,6 @@ public:
         }
 #endif
         return points.size() > 3 ? "square" : (points.size() > 2 ? "triangle" : "dot");
-
     }
 
     std::string commandForSymbol(const std::string& symbol) const {

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <thread>
 
+// TODO: provide real-time UI for desktop gesture capture
+
 int main() {
     sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");
     sc::InputManager input;

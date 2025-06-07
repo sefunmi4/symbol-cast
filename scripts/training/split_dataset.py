@@ -5,6 +5,8 @@ import random
 import shutil
 from pathlib import Path
 
+# TODO: support stratified sampling by symbol type
+
 
 def main():
     p = argparse.ArgumentParser()

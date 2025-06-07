@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <fstream>
 
+// TODO: integrate with real OpenXR controller input
+
 namespace sc {
 struct Point3D {
     float x;
@@ -30,7 +32,6 @@ public:
             out << p.x << ',' << p.y << ',' << p.z << '\n';
         }
     }
-  
 private:
     bool m_capturing;
     std::vector<Point3D> m_points;

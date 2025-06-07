@@ -3,6 +3,8 @@
 #include "core/recognition/ModelRunner.hpp"
 #include "utils/Logger.hpp"
 
+// TODO: replace placeholder data with actual OpenXR-based capture loop
+
 int main() {
     sc::log(sc::LogLevel::Info, "SymbolCast VR starting");
     sc::InputManager input;

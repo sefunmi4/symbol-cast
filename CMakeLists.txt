@@ -49,5 +49,4 @@ add_executable(test_vr_capture tests/test_vr_capture.cpp)
 target_link_libraries(test_vr_capture PRIVATE symbolcast_core)
 add_test(NAME TestVRCapture COMMAND test_vr_capture)
 
-
 enable_testing()

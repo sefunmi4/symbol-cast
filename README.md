@@ -73,6 +73,7 @@ cmake -DSC_USE_ONNXRUNTIME=ON ..
 ```
 
 
+
 ---
 
 ### 🧪 Training a Model
@@ -139,3 +140,11 @@ This project is licensed under the MIT License.
 ### 🌌 Vision
 
 SymbolCast is more than an input engine — it’s a step toward a world where users interact with their OS like spellcasters, using gestures, voice, and intention. Whether on a desktop or in virtual reality, SymbolCast reimagines computing as a symbolic dialogue between human and machine.
+
+## TODO Before Reddit Release
+
+<!-- TODO: Expand dataset with more symbols and capture utilities -->
+- Document VR controller setup with OpenXR
+- Provide pre-trained demo model in `models/`
+- Improve CI matrix with sanitizer builds
+- Add GUI for easier data collection

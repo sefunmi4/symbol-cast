@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+// TODO: hook InputManager into real OS events and add gesture smoothing
+
 namespace sc {
 
 // Simple 2D point
