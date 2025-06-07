@@ -25,6 +25,9 @@ data/           # Symbol dataset (raw, labeled, and processed)
 models/         # Trained ML models (ONNX, TFLite)
 scripts/        # Training scripts and utilities
 ```
+Raw gesture captures are stored as CSV files under `data/raw`. Labeled training
+samples belong in `data/labeled`, one CSV per symbol instance. Each CSV contains
+lines of `x,y` pairs representing a drawing stroke.
 ---
 
 ## 🚀 Quick Start
@@ -51,26 +54,46 @@ make
 ./symbolcast-desktop
 ```
 
-The MVP demo starts capturing after a simulated double tap, plays back the drawn
-gesture path in the console, and prints the predicted symbol.
+An overlay window sized to your trackpad will appear. Set environment variables `SC_TRACKPAD_WIDTH` and `SC_TRACKPAD_HEIGHT` (in pixels) to match your device. Tap the trackpad to see ripples, double tap to start drawing, then double tap again to submit your glowing trace for recognition.
 
 ### Build and run the VR app
 ```bash
 make symbolcast-vr
 ./symbolcast-vr
 ```
+VR captures are written in 3D and can later be exported to CSV for training. The
+VR example writes the gesture to `captured_vr_gesture.csv` using `VRInputManager`.
+
+To enable ONNX Runtime support set the environment variable `ONNXRUNTIME_ROOT`
+and pass `-DSC_USE_ONNXRUNTIME=ON` to CMake:
+
+```bash
+cmake -DSC_USE_ONNXRUNTIME=ON ..
+```
+
 
 
 ---
 
 ### 🧪 Training a Model
 1. Draw and label symbols via the app
-2. Export the dataset to data/labeled/
-3. Run training script:
+2. Export the dataset to `data/labeled/` (CSV files containing `x,y` points)
+3. Run the training script to generate an ONNX model:
 
 ```bash
 cd scripts/training
-python train_symbol_model.py --data_dir ../../data/labeled --output_model ../../models/symbolcast-v1.onnx
+python train_symbol_model.py \
+    --data_dir ../../data/labeled \
+    --output_model ../../models/symbolcast-v1.onnx
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
 ```
 
 
@@ -100,6 +123,8 @@ python train_symbol_model.py --data_dir ../../data/labeled --output_model ../../
 
 Pull requests are welcome! For major changes, please open an issue to discuss what you’d like to add or improve.
 
+Continuous integration builds and tests the project on Linux, macOS and Windows via GitHub Actions.
+
 ---
 
 ### 📜 License
@@ -111,3 +136,11 @@ This project is licensed under the MIT License.
 ### 🌌 Vision
 
 SymbolCast is more than an input engine — it’s a step toward a world where users interact with their OS like spellcasters, using gestures, voice, and intention. Whether on a desktop or in virtual reality, SymbolCast reimagines computing as a symbolic dialogue between human and machine.
+
+## TODO Before Reddit Release
+
+<!-- TODO: Expand dataset with more symbols and capture utilities -->
+- Document VR controller setup with OpenXR
+- Provide pre-trained demo model in `models/`
+- Improve CI matrix with sanitizer builds
+- Add GUI for easier data collection
