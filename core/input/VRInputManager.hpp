@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <cstdint>
+#include <fstream>
 
 namespace sc {
 struct Point3D {
@@ -23,6 +24,13 @@ public:
 
     const std::vector<Point3D>& points() const { return m_points; }
 
+    void exportCSV(const std::string& path) const {
+        std::ofstream out(path);
+        for (const auto& p : m_points) {
+            out << p.x << ',' << p.y << ',' << p.z << '\n';
+        }
+    }
+  
 private:
     bool m_capturing;
     std::vector<Point3D> m_points;

@@ -62,7 +62,15 @@ gesture path in the console, and prints the predicted symbol.
 make symbolcast-vr
 ./symbolcast-vr
 ```
-VR captures are written in 3D and can later be exported to CSV for training.
+VR captures are written in 3D and can later be exported to CSV for training. The
+VR example writes the gesture to `captured_vr_gesture.csv` using `VRInputManager`.
+
+To enable ONNX Runtime support set the environment variable `ONNXRUNTIME_ROOT`
+and pass `-DSC_USE_ONNXRUNTIME=ON` to CMake:
+
+```bash
+cmake -DSC_USE_ONNXRUNTIME=ON ..
+```
 
 
 ---
@@ -77,6 +85,16 @@ cd scripts/training
 python train_symbol_model.py \
     --data_dir ../../data/labeled \
     --output_model ../../models/symbolcast-v1.onnx
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
+
 ```
 The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
 version control).
@@ -107,6 +125,8 @@ version control).
 ### 🤝 Contributing
 
 Pull requests are welcome! For major changes, please open an issue to discuss what you’d like to add or improve.
+
+Continuous integration builds and tests the project on Linux, macOS and Windows via GitHub Actions.
 
 ---
 

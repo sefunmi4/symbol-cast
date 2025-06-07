@@ -14,10 +14,11 @@ int main() {
     input.onTap(0);
     input.onTap(200);
     vrInput.startCapture();
-
     vrInput.addPoint(0.f, 0.f, 0.f);
     vrInput.addPoint(0.f, 1.f, 0.5f);
+    vrInput.addPoint(1.f, 1.f, 1.f);
     vrInput.stopCapture();
+    vrInput.exportCSV("captured_vr_gesture.csv");
 
     sc::log(sc::LogLevel::Info, "Playing back captured path:");
     input.playbackPath();

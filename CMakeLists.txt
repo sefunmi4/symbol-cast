@@ -8,6 +8,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(symbolcast_core INTERFACE)
 target_include_directories(symbolcast_core INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
 
+option(SC_USE_ONNXRUNTIME "Enable ONNX Runtime" OFF)
+if(SC_USE_ONNXRUNTIME)
+  find_path(ONNXRUNTIME_INCLUDE onnxruntime_cxx_api.h PATHS $ENV{ONNXRUNTIME_ROOT}/include)
+  find_library(ONNXRUNTIME_LIB onnxruntime PATHS $ENV{ONNXRUNTIME_ROOT}/lib)
+  if(NOT ONNXRUNTIME_INCLUDE OR NOT ONNXRUNTIME_LIB)
+    message(FATAL_ERROR "ONNX Runtime not found")
+  endif()
+  target_include_directories(symbolcast_core INTERFACE ${ONNXRUNTIME_INCLUDE})
+  target_link_libraries(symbolcast_core INTERFACE ${ONNXRUNTIME_LIB})
+  target_compile_definitions(symbolcast_core INTERFACE SC_USE_ONNXRUNTIME)
+endif()
+
 # Desktop application
 add_executable(symbolcast-desktop apps/desktop/main.cpp)
 target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core)
@@ -28,5 +40,14 @@ add_test(NAME TestDoubleTap COMMAND test_double_tap)
 add_executable(test_command_mapping tests/test_command_mapping.cpp)
 target_link_libraries(test_command_mapping PRIVATE symbolcast_core)
 add_test(NAME TestCommandMapping COMMAND test_command_mapping)
+
+add_executable(test_timestamp tests/test_timestamp.cpp)
+target_link_libraries(test_timestamp PRIVATE symbolcast_core)
+add_test(NAME TestTimestamp COMMAND test_timestamp)
+
+add_executable(test_vr_capture tests/test_vr_capture.cpp)
+target_link_libraries(test_vr_capture PRIVATE symbolcast_core)
+add_test(NAME TestVRCapture COMMAND test_vr_capture)
+
 
 enable_testing()
