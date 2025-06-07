@@ -95,6 +95,18 @@ You can split the labeled dataset into training and test sets with
 ```bash
 python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
 ```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
+
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
 
 
 ---
