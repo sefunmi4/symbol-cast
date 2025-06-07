@@ -54,7 +54,7 @@ make
 ./symbolcast-desktop
 ```
 
-An overlay window sized to your trackpad will appear. Set environment variables `SC_TRACKPAD_WIDTH` and `SC_TRACKPAD_HEIGHT` (in pixels) to match your device. Tap the trackpad to see ripples, double tap to start drawing, then double tap again to submit your glowing trace for recognition.
+An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
 
 
 ### Build and run the VR app

@@ -22,6 +22,8 @@ public:
     {
         setAttribute(Qt::WA_TranslucentBackground);
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+        setMouseTracking(true);
+        setCursor(Qt::BlankCursor);
         int w = qEnvironmentVariableIntValue("SC_TRACKPAD_WIDTH");
         int h = qEnvironmentVariableIntValue("SC_TRACKPAD_HEIGHT");
         if (w <= 0) w = 400;
@@ -68,11 +70,12 @@ protected:
         update();
     }
     void mouseMoveEvent(QMouseEvent* event) override {
+        m_ripples.push_back({event->pos(), 0.f, 1.f});
         if (m_input.capturing()) {
             m_points.push_back(event->pos());
             m_input.addPoint(event->pos().x(), event->pos().y());
-            update();
         }
+        update();
     }
     void mouseReleaseEvent(QMouseEvent* event) override {
         Q_UNUSED(event);
