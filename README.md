@@ -25,6 +25,9 @@ data/           # Symbol dataset (raw, labeled, and processed)
 models/         # Trained ML models (ONNX, TFLite)
 scripts/        # Training scripts and utilities
 ```
+Raw gesture captures are stored as CSV files under `data/raw`. Labeled training
+samples belong in `data/labeled`, one CSV per symbol instance. Each CSV contains
+lines of `x,y` pairs representing a drawing stroke.
 ---
 
 ## 🚀 Quick Start
@@ -59,19 +62,24 @@ gesture path in the console, and prints the predicted symbol.
 make symbolcast-vr
 ./symbolcast-vr
 ```
+VR captures are written in 3D and can later be exported to CSV for training.
 
 
 ---
 
 ### 🧪 Training a Model
 1. Draw and label symbols via the app
-2. Export the dataset to data/labeled/
-3. Run training script:
+2. Export the dataset to `data/labeled/` (CSV files containing `x,y` points)
+3. Run the training script to generate an ONNX model:
 
 ```bash
 cd scripts/training
-python train_symbol_model.py --data_dir ../../data/labeled --output_model ../../models/symbolcast-v1.onnx
+python train_symbol_model.py \
+    --data_dir ../../data/labeled \
+    --output_model ../../models/symbolcast-v1.onnx
 ```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
 
 
 ---
