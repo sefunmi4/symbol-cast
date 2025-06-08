@@ -27,7 +27,10 @@ scripts/        # Training scripts and utilities
 ```
 Raw gesture captures are stored as CSV files under `data/raw`. Labeled training
 samples belong in `data/labeled`, one CSV per symbol instance. Each CSV contains
-lines of `x,y` pairs representing a drawing stroke.
+lines of `x,y` pairs representing a drawing stroke. The filename prefix denotes
+the symbol label, e.g. `triangle_01.csv`. 3D VR captures may contain `x,y,z`
+triples.
+
 ---
 
 ## 🚀 Quick Start
@@ -42,6 +45,9 @@ cd symbolcast
 ```
 
 ### 2. Build with CMake
+Install Qt (and optionally ONNX Runtime) for your platform. On macOS you can use
+Homebrew: `brew install qt`. On Windows, install Qt via the official
+installer and ensure `qmake` is in your PATH.
 
 ```bash
 mkdir build && cd build
@@ -56,6 +62,7 @@ make
 An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
 Lifting your finger while drawing clears the current trace so you can reposition and start a new one without leaving drawing mode.
 
+An overlay window sized to your trackpad will appear with rounded corners and a thin border. You can drag the window by this border or resize it by grabbing an edge. Your system cursor disappears inside the overlay, and any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition. Press **Esc** or **Ctrl+C** at any time to exit.
 
 
 ### Build and run the VR app
@@ -64,10 +71,13 @@ make symbolcast-vr
 ./symbolcast-vr
 ```
 VR captures are written in 3D and can later be exported to CSV for training. The
-VR example writes the gesture to `captured_vr_gesture.csv` using `VRInputManager`.
+VR example connects to a mock controller and writes the gesture to
+`captured_vr_gesture.csv` using `VRInputManager::exportCSV`.
 
-To enable ONNX Runtime support set the environment variable `ONNXRUNTIME_ROOT`
-and pass `-DSC_USE_ONNXRUNTIME=ON` to CMake:
+To enable ONNX Runtime support, download the prebuilt package and set the
+environment variable `ONNXRUNTIME_ROOT` to its location. Then pass
+`-DSC_USE_ONNXRUNTIME=ON` to CMake:
+
 
 ```bash
 cmake -DSC_USE_ONNXRUNTIME=ON ..
@@ -88,14 +98,20 @@ python train_symbol_model.py \
     --data_dir ../../data/labeled \
     --output_model ../../models/symbolcast-v1.onnx
 ```
-The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
-version control).
+The generated model will be written to `models/symbolcast-v1.onnx`. Run this script before launching the apps so a model is available for inference.
+
 
 You can split the labeled dataset into training and test sets with
 `scripts/training/split_dataset.py`:
 
 ```bash
 python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
+```
+You can preview any CSV file using the `visualize_gesture.py` helper:
+
+```bash
+python visualize_gesture.py ../../data/labeled/triangle_01.csv
+
 ```
 The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
 version control).
@@ -117,6 +133,8 @@ version control).
 - C++17 or later
 - Qt 6+ (for GUI)
 - OpenXR / SteamVR (for VR support)
+  - install the OpenXR runtime for your headset and make sure the loader
+    libraries are discoverable by CMake
 - ONNX Runtime (for model inference)
 - Python (for training scripts)
 
@@ -155,6 +173,5 @@ SymbolCast is more than an input engine — it’s a step toward a world where u
 
 <!-- TODO: Expand dataset with more symbols and capture utilities -->
 - Document VR controller setup with OpenXR
-- Provide pre-trained demo model in `models/`
 - Improve CI matrix with sanitizer builds
 - Add GUI for easier data collection

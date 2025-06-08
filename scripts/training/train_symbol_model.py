@@ -6,8 +6,12 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+# Basic model training using scikit-learn. Provides optional augmentation and
+# reports cross-validation accuracy before exporting the model to ONNX.
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
+from sklearn.model_selection import train_test_split, cross_val_score
+
 
 # TODO: add data augmentation and cross-validation
 
@@ -16,6 +20,8 @@ def main():
     parser.add_argument("--data_dir", required=True, help="Directory of labeled CSV files")
     parser.add_argument("--output_model", required=True, help="Path to output ONNX model")
     parser.add_argument("--max_points", type=int, default=3, help="Number of points to use per sample")
+    parser.add_argument("--augment", type=int, default=0,
+                        help="Number of jittered copies to add per sample")
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir)
@@ -35,12 +41,19 @@ def main():
         points += [0.0] * (args.max_points * 2 - len(points))
         X.append(points)
         y.append(label)
+        # augmentation via random jitter
+        for _ in range(args.augment):
+            jitter = np.random.normal(scale=0.02, size=len(points))
+            X.append((np.array(points) + jitter).tolist())
+            y.append(label)
 
     X = np.array(X, dtype=np.float32)
     pipeline = Pipeline([
         ("scaler", StandardScaler()),
         ("knn", KNeighborsClassifier(n_neighbors=1)),
     ])
+    scores = cross_val_score(pipeline, X, y, cv=3)
+    print(f"Cross-val accuracy: {scores.mean():.2f} (+/- {scores.std():.2f})")
     pipeline.fit(X, y)
 
     initial_type = [("input", FloatTensorType([None, args.max_points * 2]))]
