@@ -1,6 +1,5 @@
 #ifndef CANVASWINDOW_HPP
 #define CANVASWINDOW_HPP
-
 #include "core/input/InputManager.hpp"
 #include "core/recognition/ModelRunner.hpp"
 #include "utils/Logger.hpp"
@@ -25,6 +24,7 @@ public:
   explicit CanvasWindow(QWidget *parent = nullptr)
       : QWidget(parent), m_dragging(false), m_resizing(false),
         m_resizeEdges(0), m_borderWidth(2) {
+
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                    Qt::WindowStaysOnTopHint);
