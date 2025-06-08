@@ -74,13 +74,13 @@ You can customize the appearance of ripples and strokes:
 ```
 --ripple-growth <rate>   Ripple growth per frame (default: 2.0)
 --ripple-max <radius>    Maximum ripple radius (default: 80)
---ripple-color <hex>     Ripple color in hex (default: #ffffff96)
+--ripple-color <hex>     Ripple color in hex (default: #fffbe096)
 --stroke-width <px>      Stroke width in pixels (default: 3)
---stroke-color <hex>     Stroke color in hex (default: #ffffff)
+--stroke-color <hex>     Stroke color in hex (default: #fffbe0)
 --fade-rate <rate>       Stroke fade per frame (default: 0.005)
 ```
 
-An overlay window sized to your trackpad will appear with rounded corners and a thin border. Instructions are shown in light gray until you start drawing. You can drag the window by pressing and then moving while capture is off (dragging only begins after you move, so double taps won't shift the window) or resize it by grabbing an edge. Your system cursor disappears inside the overlay, and any finger motion creates a fading ripple. Double tap (or double click) to begin drawing; a white glowing trace follows your finger and gradually fades away so you can write multi-stroke symbols. Tap once to submit the trace for recognition. The instructions reappear after a few seconds of inactivity. Press **Esc** or **Ctrl+C** at any time to exit. The console logs when capture starts, each point is recorded, and when a symbol is detected.
+An overlay window sized to your trackpad will appear with rounded corners and a thin border. Instructions are shown in light gray until you start drawing. You can drag the window by pressing and then moving while capture is off (dragging only begins after you move, so double taps won't shift the window) or resize it by grabbing an edge. Your system cursor disappears inside the overlay, and any finger motion creates a fading ripple. Double tap (or double click) to begin drawing; a soft yellow trace follows your finger and gradually fades away so you can write multi-stroke symbols. Tap once to submit the trace for recognition. The instructions reappear after a few seconds of inactivity. Press **Esc** or **Ctrl+C** at any time to exit. The console logs when capture starts, each point is recorded, and when a symbol is detected.
 
 ### Build and run the VR app
 ```bash
