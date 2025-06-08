@@ -66,6 +66,9 @@ public:
     styleBtn(m_closeBtn, "#ff5f57");
     styleBtn(m_minBtn, "#ffbd2e");
     styleBtn(m_maxBtn, "#28c840");
+    m_closeBtn->setCursor(Qt::ArrowCursor);
+    m_minBtn->setCursor(Qt::ArrowCursor);
+    m_maxBtn->setCursor(Qt::ArrowCursor);
     m_closeBtn->move(8, 8);
     m_minBtn->move(26, 8);
     m_maxBtn->move(44, 8);
@@ -129,6 +132,7 @@ protected:
         m_fadePoints.clear();
         m_fading = false;
         m_points.push_back(event->pos());
+        m_input.addPoint(event->pos().x(), event->pos().y());
         m_label->hide();
       } else {
         m_fadePoints = m_points;
@@ -140,6 +144,7 @@ protected:
     } else if (m_input.capturing()) {
       if (m_points.empty())
         m_points.push_back(event->pos());
+      m_input.addPoint(event->pos().x(), event->pos().y());
     }
     update();
   }
@@ -202,7 +207,12 @@ protected:
       p.drawEllipse(r.pos, r.radius, r.radius);
     }
     // drawing path
-    if (m_points.size() >= 2) {
+    if (m_points.size() == 1) {
+      QPen pen(QColor(0, 255, 0, 180), 2);
+      p.setPen(Qt::NoPen);
+      p.setBrush(QColor(0, 255, 0, 180));
+      p.drawEllipse(m_points[0], 2, 2);
+    } else if (m_points.size() >= 2) {
       QPen pen(QColor(0, 255, 0, 180), 2);
       p.setPen(pen);
       for (size_t i = 1; i < m_points.size(); ++i)
