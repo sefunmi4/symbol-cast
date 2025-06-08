@@ -1,6 +1,5 @@
 #ifndef CANVASWINDOW_HPP
 #define CANVASWINDOW_HPP
-
 #include "core/input/InputManager.hpp"
 #include "core/recognition/ModelRunner.hpp"
 #include "utils/Logger.hpp"
