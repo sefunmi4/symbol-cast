@@ -3,6 +3,54 @@
 #include <vector>
 #include <optional>
 #include "../input/InputManager.hpp"
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
+
+// TODO: refactor for dynamic input size and model versioning
+#ifdef SC_USE_ONNXRUNTIME
+#  include <onnxruntime_cxx_api.h>
+#endif
 
 // TODO: refactor for dynamic input size and model versioning
 #ifdef SC_USE_ONNXRUNTIME

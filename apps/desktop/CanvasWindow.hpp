@@ -1,6 +1,5 @@
 #ifndef CANVASWINDOW_HPP
 #define CANVASWINDOW_HPP
-
 #include "core/input/InputManager.hpp"
 #include "core/recognition/ModelRunner.hpp"
 #include "utils/Logger.hpp"
@@ -188,7 +187,6 @@ protected:
       else
         setCursor(Qt::BlankCursor);
     }
-
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (m_input.capturing()) {
       if (m_strokes.empty())
