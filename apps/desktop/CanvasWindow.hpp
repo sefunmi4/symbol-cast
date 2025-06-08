@@ -24,7 +24,6 @@ public:
   explicit CanvasWindow(QWidget *parent = nullptr)
       : QWidget(parent), m_dragging(false), m_resizing(false),
         m_resizeEdges(0), m_borderWidth(2) {
-
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                    Qt::WindowStaysOnTopHint);
@@ -109,6 +108,7 @@ protected:
     if (event->button() == Qt::LeftButton) {
       int edges = edgesForPos(event->pos());
       if (edges != EdgeNone) {
+        sc::log(sc::LogLevel::Info, "Resize start");
         m_resizing = true;
         m_resizeEdges = edges;
         m_originPos = event->globalPos();
@@ -116,6 +116,7 @@ protected:
         return;
       }
       if (!m_input.capturing()) {
+        sc::log(sc::LogLevel::Info, "Drag start");
         m_dragging = true;
         m_dragPos = event->globalPos() - frameGeometry().topLeft();
         return;
@@ -129,11 +130,14 @@ protected:
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (dbl) {
       if (m_input.capturing()) {
+        sc::log(sc::LogLevel::Info, "Capture started");
         m_strokes.clear();
         m_strokes.push_back({{event->pos()}, 1.f});
         m_input.addPoint(event->pos().x(), event->pos().y());
+        sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
         m_label->hide();
       } else {
+        sc::log(sc::LogLevel::Info, "Capture ended");
         onSubmit();
       }
     } else if (m_input.capturing()) {
@@ -141,6 +145,7 @@ protected:
         m_strokes.push_back({});
       m_strokes.back().points.push_back(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
+      sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
     }
     update();
@@ -164,19 +169,41 @@ protected:
       setGeometry(r);
       return;
     }
+
     resetIdleTimer();
+    int edges = edgesForPos(event->pos());
+    if (!m_input.capturing() && !m_dragging && !m_resizing) {
+      QWidget* c = childAt(event->pos());
+      if (c == m_closeBtn || c == m_minBtn || c == m_maxBtn) {
+        // leave button cursors untouched
+      } else if (edges == (EdgeLeft | EdgeTop) || edges == (EdgeRight | EdgeBottom))
+        setCursor(Qt::SizeFDiagCursor);
+      else if (edges == (EdgeRight | EdgeTop) || edges == (EdgeLeft | EdgeBottom))
+        setCursor(Qt::SizeBDiagCursor);
+      else if (edges == EdgeLeft || edges == EdgeRight)
+        setCursor(Qt::SizeHorCursor);
+      else if (edges == EdgeTop || edges == EdgeBottom)
+        setCursor(Qt::SizeVerCursor);
+      else
+        setCursor(Qt::BlankCursor);
+    }
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (m_input.capturing()) {
       if (m_strokes.empty())
         m_strokes.push_back({});
       m_strokes.back().points.push_back(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
+      sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
     }
     update();
   }
   void mouseReleaseEvent(QMouseEvent *event) override {
     if (event->button() == Qt::LeftButton) {
+      if (m_dragging)
+        sc::log(sc::LogLevel::Info, "Drag end");
+      if (m_resizing)
+        sc::log(sc::LogLevel::Info, "Resize end");
       m_dragging = false;
       m_resizing = false;
       resetIdleTimer();
@@ -231,7 +258,9 @@ private slots:
       return;
     }
     auto sym = runner.run(m_input.points());
-    sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + sym);
+    auto cmd = runner.commandForSymbol(sym);
+    sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + sym +
+                                     ", command: " + cmd);
     m_input.clear();
     m_idleTimer->start();
     update();
@@ -286,7 +315,7 @@ private:
     float opacity{1.f};
   };
   std::vector<Stroke> m_strokes;
-  float m_fadeRate{0.01f};
+  float m_fadeRate{0.005f};
   std::vector<Ripple> m_ripples;
   QTimer *m_timer;
   QTimer *m_idleTimer;
