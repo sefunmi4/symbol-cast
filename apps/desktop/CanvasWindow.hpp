@@ -11,6 +11,7 @@
 #include <QPainterPath>
 #include <QPushButton>
 #include <QLabel>
+#include <QColor>
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QTimer>
@@ -21,8 +22,17 @@
 class CanvasWindow : public QWidget {
   Q_OBJECT
 public:
-  explicit CanvasWindow(QWidget *parent = nullptr)
-      : QWidget(parent), m_dragging(false), m_resizing(false),
+  struct Options {
+    float rippleGrowthRate{2.f};
+    float rippleMaxRadius{80.f};
+    QColor rippleColor{255, 255, 255, 150};
+    int strokeWidth{3};
+    QColor strokeColor{255, 255, 255};
+    float fadeRate{0.005f};
+  };
+
+  explicit CanvasWindow(const Options &opts = Options(), QWidget *parent = nullptr)
+      : QWidget(parent), m_options(opts), m_dragging(false), m_resizing(false),
         m_pressPending(false), m_resizeEdges(0), m_borderWidth(2) {
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
@@ -238,7 +248,8 @@ protected:
     p.setClipPath(path);
     // ripples
     for (auto &r : m_ripples) {
-      QColor c(255, 255, 255, static_cast<int>(150 * r.opacity));
+      QColor c = m_options.rippleColor;
+      c.setAlphaF(c.alphaF() * r.opacity);
       p.setPen(Qt::NoPen);
       p.setBrush(c);
       p.drawEllipse(r.pos, r.radius, r.radius);
@@ -247,8 +258,9 @@ protected:
     for (const auto &s : m_strokes) {
       if (s.points.empty())
         continue;
-      QColor col(255, 255, 255, static_cast<int>(255 * s.opacity));
-      QPen pen(col, 3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+      QColor col = m_options.strokeColor;
+      col.setAlphaF(col.alphaF() * s.opacity);
+      QPen pen(col, m_options.strokeWidth);
       p.setPen(pen);
       if (s.path.isEmpty()) {
         p.drawEllipse(s.points.front(), 2, 2);
@@ -277,15 +289,16 @@ private slots:
   }
   void onFrame() {
     for (auto &r : m_ripples) {
-      r.radius += 2.0f;
+      r.radius += m_options.rippleGrowthRate;
       r.opacity -= 0.05f;
     }
     m_ripples.erase(
-        std::remove_if(m_ripples.begin(), m_ripples.end(),
-                       [](const Ripple &r) { return r.opacity <= 0.f; }),
+        std::remove_if(m_ripples.begin(), m_ripples.end(), [&](const Ripple &r) {
+          return r.opacity <= 0.f || r.radius >= m_options.rippleMaxRadius;
+        }),
         m_ripples.end());
     for (auto &s : m_strokes)
-      s.opacity -= m_fadeRate;
+      s.opacity -= m_options.fadeRate;
     m_strokes.erase(std::remove_if(m_strokes.begin(), m_strokes.end(),
                                    [&](const Stroke &s) {
                                      return s.opacity <= 0.f;
@@ -363,7 +376,7 @@ private:
     }
   };
   std::vector<Stroke> m_strokes;
-  float m_fadeRate{0.005f};
+  Options m_options;
   std::vector<Ripple> m_ripples;
   QTimer *m_timer;
   QTimer *m_idleTimer;
