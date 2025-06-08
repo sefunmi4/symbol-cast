@@ -79,6 +79,11 @@ protected:
     }
     void mouseReleaseEvent(QMouseEvent* event) override {
         Q_UNUSED(event);
+        if (m_input.capturing()) {
+            m_input.clear();
+            m_points.clear();
+            update();
+        }
     }
     void paintEvent(QPaintEvent*) override {
         QPainter p(this);
