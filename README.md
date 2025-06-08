@@ -53,9 +53,9 @@ make
 ```bash
 ./symbolcast-desktop
 ```
-
 An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
 Lifting your finger while drawing clears the current trace so you can reposition and start a new one without leaving drawing mode.
+
 
 
 ### Build and run the VR app
