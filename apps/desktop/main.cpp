@@ -22,6 +22,8 @@ int main(int argc, char** argv) {
         "Stroke color (hex)", "color", "#fffbe0");
     QCommandLineOption fadeRateOpt({"f", "fade-rate"},
         "Stroke fade per frame", "rate", "0.005");
+    QCommandLineOption detectionColorOpt({"d", "detection-color"},
+        "Detection box color (hex)", "color", "#ffffff66");
 
     parser.addOption(rippleGrowthOpt);
     parser.addOption(rippleMaxOpt);
@@ -29,6 +31,7 @@ int main(int argc, char** argv) {
     parser.addOption(strokeWidthOpt);
     parser.addOption(strokeColorOpt);
     parser.addOption(fadeRateOpt);
+    parser.addOption(detectionColorOpt);
 
     parser.process(app);
 
@@ -41,6 +44,9 @@ int main(int argc, char** argv) {
     opts.strokeColor = QColor(parser.value(strokeColorOpt));
     if (!opts.strokeColor.isValid()) opts.strokeColor = QColor("#fffbe0");
     opts.fadeRate = parser.value(fadeRateOpt).toFloat();
+    opts.detectionColor = QColor(parser.value(detectionColorOpt));
+    if (!opts.detectionColor.isValid())
+        opts.detectionColor = QColor("#ffffff66");
 
     sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");
     CanvasWindow win(opts);
