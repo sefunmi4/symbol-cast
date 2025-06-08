@@ -22,8 +22,9 @@ class CanvasWindow : public QWidget {
   Q_OBJECT
 public:
   explicit CanvasWindow(QWidget *parent = nullptr)
-      : QWidget(parent), m_fadeOpacity(0.0), m_fading(false), m_dragging(false),
-        m_resizing(false), m_resizeEdges(0), m_borderWidth(2) {
+      : QWidget(parent), m_dragging(false), m_resizing(false),
+        m_resizeEdges(0), m_borderWidth(2) {
+
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                    Qt::WindowStaysOnTopHint);
@@ -128,23 +129,19 @@ protected:
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (dbl) {
       if (m_input.capturing()) {
-        m_points.clear();
-        m_fadePoints.clear();
-        m_fading = false;
-        m_points.push_back(event->pos());
+        m_strokes.clear();
+        m_strokes.push_back({{event->pos()}, 1.f});
         m_input.addPoint(event->pos().x(), event->pos().y());
         m_label->hide();
       } else {
-        m_fadePoints = m_points;
-        m_fadeOpacity = 1.f;
-        m_points.clear();
-        m_fading = true;
         onSubmit();
       }
     } else if (m_input.capturing()) {
-      if (m_points.empty())
-        m_points.push_back(event->pos());
+      if (m_strokes.empty())
+        m_strokes.push_back({});
+      m_strokes.back().points.push_back(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
+      m_label->hide();
     }
     update();
   }
@@ -170,7 +167,9 @@ protected:
     resetIdleTimer();
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (m_input.capturing()) {
-      m_points.push_back(event->pos());
+      if (m_strokes.empty())
+        m_strokes.push_back({});
+      m_strokes.back().points.push_back(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       m_label->hide();
     }
@@ -206,23 +205,19 @@ protected:
       p.setBrush(c);
       p.drawEllipse(r.pos, r.radius, r.radius);
     }
-    // drawing path
-    if (m_points.size() == 1) {
-      QPen pen(QColor(0, 255, 0, 180), 2);
-      p.setPen(Qt::NoPen);
-      p.setBrush(QColor(0, 255, 0, 180));
-      p.drawEllipse(m_points[0], 2, 2);
-    } else if (m_points.size() >= 2) {
-      QPen pen(QColor(0, 255, 0, 180), 2);
+    // strokes
+    for (const auto &s : m_strokes) {
+      if (s.points.empty())
+        continue;
+      QColor col(255, 255, 255, static_cast<int>(255 * s.opacity));
+      QPen pen(col, 3);
       p.setPen(pen);
-      for (size_t i = 1; i < m_points.size(); ++i)
-        p.drawLine(m_points[i - 1], m_points[i]);
-    }
-    if (!m_fadePoints.empty()) {
-      QPen pen(QColor(0, 255, 0, static_cast<int>(180 * m_fadeOpacity)), 2);
-      p.setPen(pen);
-      for (size_t i = 1; i < m_fadePoints.size(); ++i)
-        p.drawLine(m_fadePoints[i - 1], m_fadePoints[i]);
+      if (s.points.size() == 1) {
+        p.drawEllipse(s.points[0], 2, 2);
+      } else {
+        for (size_t i = 1; i < s.points.size(); ++i)
+          p.drawLine(s.points[i - 1], s.points[i]);
+      }
     }
   }
 
@@ -238,7 +233,6 @@ private slots:
     auto sym = runner.run(m_input.points());
     sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + sym);
     m_input.clear();
-    m_points.clear();
     m_idleTimer->start();
     update();
   }
@@ -251,14 +245,13 @@ private slots:
         std::remove_if(m_ripples.begin(), m_ripples.end(),
                        [](const Ripple &r) { return r.opacity <= 0.f; }),
         m_ripples.end());
-    if (m_fading) {
-      m_fadeOpacity -= 0.01f;
-      if (m_fadeOpacity <= 0.f) {
-        m_fadeOpacity = 0.f;
-        m_fading = false;
-        m_fadePoints.clear();
-      }
-    }
+    for (auto &s : m_strokes)
+      s.opacity -= m_fadeRate;
+    m_strokes.erase(std::remove_if(m_strokes.begin(), m_strokes.end(),
+                                   [&](const Stroke &s) {
+                                     return s.opacity <= 0.f;
+                                   }),
+                    m_strokes.end());
     update();
   }
 
@@ -288,10 +281,12 @@ private:
   QPushButton *m_closeBtn;
   QPushButton *m_minBtn;
   QPushButton *m_maxBtn;
-  std::vector<QPointF> m_points;
-  std::vector<QPointF> m_fadePoints;
-  float m_fadeOpacity;
-  bool m_fading;
+  struct Stroke {
+    std::vector<QPointF> points;
+    float opacity{1.f};
+  };
+  std::vector<Stroke> m_strokes;
+  float m_fadeRate{0.01f};
   std::vector<Ripple> m_ripples;
   QTimer *m_timer;
   QTimer *m_idleTimer;
