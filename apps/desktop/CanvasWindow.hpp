@@ -130,14 +130,6 @@ protected:
     }
     update();
   }
-  void mouseReleaseEvent(QMouseEvent* event) override {
-    Q_UNUSED(event);
-    if (m_input.capturing()) {
-        m_input.clear();
-        m_points.clear();
-        update();
-    }
-  }
   void mouseReleaseEvent(QMouseEvent *event) override {
     if (event->button() == Qt::LeftButton) {
       m_dragging = false;
@@ -178,6 +170,14 @@ protected:
     }
   }
 
+  void mouseReleaseEvent(QMouseEvent* event) override {
+    Q_UNUSED(event);
+    if (m_input.capturing()) {
+        m_input.clear();
+        m_points.clear();
+        update();
+    }
+  }
 private slots:
   void onSubmit() {
     if (m_input.points().empty())
