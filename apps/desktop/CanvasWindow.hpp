@@ -96,7 +96,8 @@ public:
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this,
             QOverload<>::of(&CanvasWindow::onFrame));
-    m_timer->start(16);
+    // higher refresh rate for smoother drawing
+    m_timer->start(10);
   }
 
   struct Ripple {
@@ -143,7 +144,8 @@ protected:
       if (m_input.capturing()) {
         sc::log(sc::LogLevel::Info, "Capture started");
         m_strokes.clear();
-        m_strokes.push_back({{event->pos()}, 1.f});
+        m_strokes.push_back({});
+        m_strokes.back().addPoint(event->pos());
         m_input.addPoint(event->pos().x(), event->pos().y());
         sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
         m_label->hide();
@@ -154,7 +156,7 @@ protected:
     } else if (m_input.capturing()) {
       if (m_strokes.empty())
         m_strokes.push_back({});
-      m_strokes.back().points.push_back(event->pos());
+      m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
@@ -209,7 +211,7 @@ protected:
     if (m_input.capturing()) {
       if (m_strokes.empty())
         m_strokes.push_back({});
-      m_strokes.back().points.push_back(event->pos());
+      m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
@@ -260,11 +262,10 @@ protected:
       col.setAlphaF(col.alphaF() * s.opacity);
       QPen pen(col, m_options.strokeWidth);
       p.setPen(pen);
-      if (s.points.size() == 1) {
-        p.drawEllipse(s.points[0], 2, 2);
+      if (s.path.isEmpty()) {
+        p.drawEllipse(s.points.front(), 2, 2);
       } else {
-        for (size_t i = 1; i < s.points.size(); ++i)
-          p.drawLine(s.points[i - 1], s.points[i]);
+        p.drawPath(s.path);
       }
     }
   }
@@ -334,7 +335,45 @@ private:
   QPushButton *m_maxBtn;
   struct Stroke {
     std::vector<QPointF> points;
+    QPainterPath path;
     float opacity{1.f};
+
+    void addPoint(const QPointF &p) {
+      points.push_back(p);
+      rebuildPath();
+    }
+
+    void rebuildPath() {
+      path = buildPath(points);
+    }
+
+    static QPainterPath buildPath(const std::vector<QPointF> &pts) {
+      QPainterPath p;
+      if (pts.empty())
+        return p;
+
+      std::vector<QPointF> smoothed;
+      smoothed.reserve(pts.size());
+      for (size_t i = 0; i < pts.size(); ++i) {
+        if (i < 2) {
+          smoothed.push_back(pts[i]);
+        } else {
+          QPointF avg = (pts[i] + pts[i - 1] + pts[i - 2]) / 3.0;
+          smoothed.push_back(avg);
+        }
+      }
+
+      p.moveTo(smoothed[0]);
+      if (smoothed.size() == 1)
+        return p;
+
+      for (size_t i = 1; i < smoothed.size() - 1; ++i) {
+        QPointF mid = (smoothed[i] + smoothed[i + 1]) / 2.0;
+        p.quadTo(smoothed[i], mid);
+      }
+      p.lineTo(smoothed.back());
+      return p;
+    }
   };
   std::vector<Stroke> m_strokes;
   Options m_options;
