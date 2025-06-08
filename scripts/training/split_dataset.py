@@ -42,6 +42,5 @@ def main():
     print(f'Split {len(files)} files -> {train_dir} ({train_count}) / {test_dir} ({test_count})')
 
 
-
 if __name__ == '__main__':
     main()

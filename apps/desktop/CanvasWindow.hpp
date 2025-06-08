@@ -10,9 +10,10 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
+#include <QLabel>
+#include <QResizeEvent>
 #include <QShortcut>
 #include <QTimer>
-#include <QVBoxLayout>
 #include <QWidget>
 #include <algorithm>
 #include <vector>
@@ -42,13 +43,43 @@ public:
     if (h <= 0)
       h = 300;
     resize(w, h);
-    m_button = new QPushButton("Submit", this);
-    m_button->setFixedHeight(30);
-    connect(m_button, &QPushButton::clicked, this, &CanvasWindow::onSubmit);
-    QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->addStretch(1);
-    layout->addWidget(m_button);
-    layout->setContentsMargins(0, 0, 0, 0);
+    // Instruction label shown when idle
+    m_label = new QLabel(
+        tr("Double-tap to start drawing. Draw a symbol, then double-tap again to submit."),
+        this);
+    m_label->setStyleSheet("color:#CCCCCC;font-size:12px;");
+    m_label->setAlignment(Qt::AlignCenter);
+    m_label->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_label->setGeometry(rect());
+    m_label->show();
+
+    // Mac-style window controls
+    m_closeBtn = new QPushButton(this);
+    m_minBtn = new QPushButton(this);
+    m_maxBtn = new QPushButton(this);
+    const QString common =
+        "border-radius:6px;border:1px solid #00000030;";
+    auto styleBtn = [&](QPushButton *b, const QString &color) {
+      b->setFixedSize(12, 12);
+      b->setStyleSheet(QString("background:%1;%2").arg(color, common));
+    };
+    styleBtn(m_closeBtn, "#ff5f57");
+    styleBtn(m_minBtn, "#ffbd2e");
+    styleBtn(m_maxBtn, "#28c840");
+    m_closeBtn->move(8, 8);
+    m_minBtn->move(26, 8);
+    m_maxBtn->move(44, 8);
+    connect(m_closeBtn, &QPushButton::clicked, this, &QWidget::close);
+    connect(m_minBtn, &QPushButton::clicked, this, &QWidget::showMinimized);
+    connect(m_maxBtn, &QPushButton::clicked, this, [this] {
+      isMaximized() ? showNormal() : showMaximized();
+    });
+
+    m_idleTimer = new QTimer(this);
+    connect(m_idleTimer, &QTimer::timeout, this, [this] { m_label->show(); });
+    m_idleTimer->setInterval(5000);
+    m_idleTimer->start();
+
     m_timer = new QTimer(this);
     connect(m_timer, &QTimer::timeout, this,
             QOverload<>::of(&CanvasWindow::onFrame));
@@ -80,7 +111,7 @@ protected:
         m_origRect = geometry();
         return;
       }
-      if (inDragZone(event->pos())) {
+      if (!m_input.capturing()) {
         m_dragging = true;
         m_dragPos = event->globalPos() - frameGeometry().topLeft();
         return;
@@ -89,6 +120,7 @@ protected:
 
     const uint64_t ts =
         static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    resetIdleTimer();
     bool dbl = m_input.onTap(ts);
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (dbl) {
@@ -97,8 +129,10 @@ protected:
         m_fadePoints.clear();
         m_fading = false;
         m_points.push_back(event->pos());
+        m_label->hide();
       } else {
         m_fadePoints = m_points;
+        m_fadeOpacity = 1.f;
         m_points.clear();
         m_fading = true;
         onSubmit();
@@ -128,19 +162,25 @@ protected:
       setGeometry(r);
       return;
     }
+    resetIdleTimer();
+    m_ripples.push_back({event->pos(), 0.f, 1.f});
+    if (m_input.capturing()) {
+      m_points.push_back(event->pos());
+      m_input.addPoint(event->pos().x(), event->pos().y());
+      m_label->hide();
+    }
     update();
   }
   void mouseReleaseEvent(QMouseEvent *event) override {
     if (event->button() == Qt::LeftButton) {
       m_dragging = false;
       m_resizing = false;
+      resetIdleTimer();
     }
-    // Also clear input and points if capturing (from duplicate definition)
-    if (m_input.capturing()) {
-        m_input.clear();
-        m_points.clear();
-        update();
-    }
+  }
+  void resizeEvent(QResizeEvent *event) override {
+    QWidget::resizeEvent(event);
+    m_label->setGeometry(rect());
   }
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
@@ -189,6 +229,7 @@ private slots:
     sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + sym);
     m_input.clear();
     m_points.clear();
+    m_idleTimer->start();
     update();
   }
   void onFrame() {
@@ -201,7 +242,7 @@ private slots:
                        [](const Ripple &r) { return r.opacity <= 0.f; }),
         m_ripples.end());
     if (m_fading) {
-      m_fadeOpacity -= 0.02f;
+      m_fadeOpacity -= 0.01f;
       if (m_fadeOpacity <= 0.f) {
         m_fadeOpacity = 0.f;
         m_fading = false;
@@ -212,10 +253,10 @@ private slots:
   }
 
 private:
-  bool inDragZone(const QPoint &p) const {
-    const int margin = 8;
-    return p.x() < margin || p.x() > width() - margin || p.y() < margin ||
-           p.y() > height() - margin;
+  void resetIdleTimer() {
+    m_idleTimer->stop();
+    m_idleTimer->start();
+    m_label->hide();
   }
 
   int edgesForPos(const QPoint &p) const {
@@ -233,13 +274,17 @@ private:
   }
 
   sc::InputManager m_input;
-  QPushButton *m_button;
+  QLabel *m_label;
+  QPushButton *m_closeBtn;
+  QPushButton *m_minBtn;
+  QPushButton *m_maxBtn;
   std::vector<QPointF> m_points;
   std::vector<QPointF> m_fadePoints;
   float m_fadeOpacity;
   bool m_fading;
   std::vector<Ripple> m_ripples;
   QTimer *m_timer;
+  QTimer *m_idleTimer;
   QShortcut *m_exitEsc;
   QShortcut *m_exitCtrlC;
   bool m_dragging;

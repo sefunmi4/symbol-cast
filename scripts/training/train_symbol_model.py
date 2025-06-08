@@ -12,7 +12,6 @@ from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 from sklearn.model_selection import train_test_split, cross_val_score
 
-
 # TODO: add data augmentation and cross-validation
 
 def main():
