@@ -24,7 +24,6 @@ public:
   explicit CanvasWindow(QWidget *parent = nullptr)
       : QWidget(parent), m_dragging(false), m_resizing(false),
         m_pressPending(false), m_resizeEdges(0), m_borderWidth(2) {
-
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                    Qt::WindowStaysOnTopHint);
@@ -167,6 +166,17 @@ protected:
       setGeometry(r);
       return;
     }
+    if (m_dragging) {
+      move(event->globalPos() - m_dragPos);
+      return;
+    }
+    if (m_pressPending && (event->buttons() & Qt::LeftButton)) {
+      if ((event->globalPos() - m_pressPos).manhattanLength() > 3) {
+        sc::log(sc::LogLevel::Info, "Drag start");
+        m_dragging = true;
+        m_pressPending = false;
+      }
+    }
 
     resetIdleTimer();
     int edges = edgesForPos(event->pos());
@@ -204,6 +214,7 @@ protected:
         sc::log(sc::LogLevel::Info, "Resize end");
       m_dragging = false;
       m_resizing = false;
+      m_pressPending = false;
       resetIdleTimer();
     }
   }
