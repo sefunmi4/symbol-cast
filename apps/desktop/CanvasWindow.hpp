@@ -27,6 +27,7 @@ struct CanvasWindowOptions {
   QColor strokeColor{255, 251, 224};
   float fadeRate{0.005f};
   QColor backgroundTint{34, 34, 34, 120};
+  QColor detectionColor{255, 255, 255, 102};
 };
 
 class CanvasWindow : public QWidget {
@@ -280,8 +281,16 @@ protected:
         p.drawPath(s.path);
       }
     }
+    if (!m_detectionRect.isNull()) {
+      QPen boxPen(m_options.detectionColor, 1, Qt::DashLine);
+      boxPen.setCapStyle(Qt::RoundCap);
+      boxPen.setJoinStyle(Qt::RoundJoin);
+      p.setPen(boxPen);
+      p.setBrush(Qt::NoBrush);
+      p.drawRect(m_detectionRect);
+    }
     if (!m_predictionPath.isEmpty() && m_predictionOpacity > 0.f) {
-      QColor predColor(200, 200, 200);
+      QColor predColor(255, 255, 255);
       predColor.setAlphaF(m_predictionOpacity);
       QPen dashPen(predColor, 1, Qt::DashLine);
       p.setPen(dashPen);
@@ -303,6 +312,7 @@ private slots:
     sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + sym +
                                      ", command: " + cmd);
     m_input.clear();
+    m_detectionRect = QRectF();
     m_idleTimer->start();
     update();
   }
@@ -354,6 +364,7 @@ private:
   void updatePrediction() {
     if (!m_showPrediction || m_input.points().empty()) {
       m_predictionPath = QPainterPath();
+      m_detectionRect = QRectF();
       return;
     }
     sc::ModelRunner runner;
@@ -377,6 +388,7 @@ private:
       maxY = std::max(maxY, pt.y);
     }
     QRectF box(QPointF(minX, minY), QPointF(maxX, maxY));
+    m_detectionRect = box;
     box.adjust(-10, -10, 10, 10);
     QPainterPath pred;
     if (sym == "triangle") {
@@ -451,6 +463,7 @@ private:
   bool m_showPrediction{true};
   QPainterPath m_predictionPath;
   float m_predictionOpacity{0.f};
+  QRectF m_detectionRect;
   bool m_dragging;
   bool m_resizing;
   bool m_pressPending;
