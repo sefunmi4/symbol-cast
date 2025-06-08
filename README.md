@@ -30,6 +30,7 @@ samples belong in `data/labeled`, one CSV per symbol instance. Each CSV contains
 lines of `x,y` pairs representing a drawing stroke. The filename prefix denotes
 the symbol label, e.g. `triangle_01.csv`. 3D VR captures may contain `x,y,z`
 triples.
+
 ---
 
 ## 🚀 Quick Start
@@ -58,8 +59,11 @@ make
 ```bash
 ./symbolcast-desktop
 ```
+An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
+Lifting your finger while drawing clears the current trace so you can reposition and start a new one without leaving drawing mode.
 
 An overlay window sized to your trackpad will appear with rounded corners and a thin border. You can drag the window by this border or resize it by grabbing an edge. Your system cursor disappears inside the overlay, and any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition. Press **Esc** or **Ctrl+C** at any time to exit.
+
 
 ### Build and run the VR app
 ```bash
@@ -73,6 +77,7 @@ VR example connects to a mock controller and writes the gesture to
 To enable ONNX Runtime support, download the prebuilt package and set the
 environment variable `ONNXRUNTIME_ROOT` to its location. Then pass
 `-DSC_USE_ONNXRUNTIME=ON` to CMake:
+
 
 ```bash
 cmake -DSC_USE_ONNXRUNTIME=ON ..
@@ -95,6 +100,7 @@ python train_symbol_model.py \
 ```
 The generated model will be written to `models/symbolcast-v1.onnx`. Run this script before launching the apps so a model is available for inference.
 
+
 You can split the labeled dataset into training and test sets with
 `scripts/training/split_dataset.py`:
 
@@ -105,7 +111,20 @@ You can preview any CSV file using the `visualize_gesture.py` helper:
 
 ```bash
 python visualize_gesture.py ../../data/labeled/triangle_01.csv
+
 ```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
+
+You can split the labeled dataset into training and test sets with
+`scripts/training/split_dataset.py`:
+
+```bash
+python split_dataset.py --data_dir ../../data/labeled --out_dir ../../data/split
+
+```
+The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
+version control).
 
 
 ---
