@@ -2,6 +2,9 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <unordered_map>
+#include <fstream>
+#include <cctype>
 #include "../input/InputManager.hpp"
 #ifdef SC_USE_ONNXRUNTIME
 #  include <onnxruntime_cxx_api.h>
@@ -72,6 +75,10 @@ namespace sc {
 // Stub model runner for loading and running gesture recognition models.
 class ModelRunner {
 public:
+    explicit ModelRunner(const std::string& commandFile = "config/commands.json") {
+        loadCommands(commandFile);
+    }
+
     bool loadModel(const std::string& path) {
         m_modelPath = path;
 #ifdef SC_USE_ONNXRUNTIME
@@ -120,16 +127,46 @@ public:
     }
 
     std::string commandForSymbol(const std::string& symbol) const {
-        if (symbol == "triangle") return "open-settings";
-        if (symbol == "dot") return "click";
-        if (symbol == "square") return "open-menu";
+        auto it = m_commands.find(symbol);
+        if (it != m_commands.end())
+            return it->second;
         return "";
     }
 
     const std::string& modelPath() const { return m_modelPath; }
 
 private:
+    void loadCommands(const std::string& path) {
+        m_commands = {
+            {"triangle", "open-settings"},
+            {"dot", "click"},
+            {"square", "open-menu"}
+        };
+        std::ifstream in(path);
+        if (!in.is_open())
+            return;
+        std::string content((std::istreambuf_iterator<char>(in)),
+                            std::istreambuf_iterator<char>());
+        size_t pos = 0;
+        while ((pos = content.find('"', pos)) != std::string::npos) {
+            size_t endKey = content.find('"', pos + 1);
+            if (endKey == std::string::npos) break;
+            std::string key = content.substr(pos + 1, endKey - pos - 1);
+            pos = content.find(':', endKey);
+            if (pos == std::string::npos) break;
+            ++pos;
+            while (pos < content.size() && std::isspace(static_cast<unsigned char>(content[pos]))) ++pos;
+            if (pos >= content.size() || content[pos] != '"') continue;
+            size_t endVal = content.find('"', pos + 1);
+            if (endVal == std::string::npos) break;
+            std::string val = content.substr(pos + 1, endVal - pos - 1);
+            m_commands[key] = val;
+            pos = endVal + 1;
+        }
+    }
+
     std::string m_modelPath;
+    std::unordered_map<std::string, std::string> m_commands;
 #ifdef SC_USE_ONNXRUNTIME
     Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "symbolcast"};
     std::optional<Ort::Session> session;
