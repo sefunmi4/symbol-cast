@@ -135,6 +135,12 @@ protected:
       m_dragging = false;
       m_resizing = false;
     }
+    // Also clear input and points if capturing (from duplicate definition)
+    if (m_input.capturing()) {
+        m_input.clear();
+        m_points.clear();
+        update();
+    }
   }
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
@@ -170,14 +176,6 @@ protected:
     }
   }
 
-  void mouseReleaseEvent(QMouseEvent* event) override {
-    Q_UNUSED(event);
-    if (m_input.capturing()) {
-        m_input.clear();
-        m_points.clear();
-        update();
-    }
-  }
 private slots:
   void onSubmit() {
     if (m_input.points().empty())
