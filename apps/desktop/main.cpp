@@ -1,11 +1,49 @@
 #include <QApplication>
 #include "CanvasWindow.hpp"
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 #include "utils/Logger.hpp"
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
+    QCommandLineParser parser;
+    parser.setApplicationDescription("SymbolCast desktop app");
+    parser.addHelpOption();
+
+    QCommandLineOption rippleGrowthOpt({"g", "ripple-growth"},
+        "Ripple growth per frame", "rate", "2.0");
+    QCommandLineOption rippleMaxOpt({"m", "ripple-max"},
+        "Maximum ripple radius", "radius", "80.0");
+    QCommandLineOption rippleColorOpt({"c", "ripple-color"},
+        "Ripple color (hex)", "color", "#ffffff96");
+    QCommandLineOption strokeWidthOpt({"w", "stroke-width"},
+        "Stroke width", "width", "3");
+    QCommandLineOption strokeColorOpt({"s", "stroke-color"},
+        "Stroke color (hex)", "color", "#ffffff");
+    QCommandLineOption fadeRateOpt({"f", "fade-rate"},
+        "Stroke fade per frame", "rate", "0.005");
+
+    parser.addOption(rippleGrowthOpt);
+    parser.addOption(rippleMaxOpt);
+    parser.addOption(rippleColorOpt);
+    parser.addOption(strokeWidthOpt);
+    parser.addOption(strokeColorOpt);
+    parser.addOption(fadeRateOpt);
+
+    parser.process(app);
+
+    CanvasWindow::Options opts;
+    opts.rippleGrowthRate = parser.value(rippleGrowthOpt).toFloat();
+    opts.rippleMaxRadius = parser.value(rippleMaxOpt).toFloat();
+    opts.rippleColor = QColor(parser.value(rippleColorOpt));
+    if (!opts.rippleColor.isValid()) opts.rippleColor = QColor("#ffffff96");
+    opts.strokeWidth = parser.value(strokeWidthOpt).toInt();
+    opts.strokeColor = QColor(parser.value(strokeColorOpt));
+    if (!opts.strokeColor.isValid()) opts.strokeColor = QColor("#ffffff");
+    opts.fadeRate = parser.value(fadeRateOpt).toFloat();
+
     sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");
-    CanvasWindow win;
+    CanvasWindow win(opts);
     win.show();
     return app.exec();
 }
