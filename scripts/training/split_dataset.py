@@ -4,8 +4,9 @@ import argparse
 import random
 import shutil
 from pathlib import Path
+from collections import defaultdict
 
-# TODO: support stratified sampling by symbol type
+# Stratified split by symbol label
 
 
 def main():
@@ -23,13 +24,22 @@ def main():
     test_dir.mkdir(parents=True, exist_ok=True)
 
     files = list(data_dir.glob('*.csv'))
-    random.shuffle(files)
-    split = int(len(files) * (1 - args.test_ratio))
-    for f in files[:split]:
-        shutil.copy(f, train_dir / f.name)
-    for f in files[split:]:
-        shutil.copy(f, test_dir / f.name)
-    print(f'Split {len(files)} files -> {train_dir} ({split}) / {test_dir} ({len(files)-split})')
+    labels = defaultdict(list)
+    for f in files:
+        label = f.stem.split('_')[0]
+        labels[label].append(f)
+    train_count = 0
+    test_count = 0
+    for lbl, lst in labels.items():
+        random.shuffle(lst)
+        split = int(len(lst) * (1 - args.test_ratio))
+        for f in lst[:split]:
+            shutil.copy(f, train_dir / f.name)
+        for f in lst[split:]:
+            shutil.copy(f, test_dir / f.name)
+        train_count += split
+        test_count += len(lst) - split
+    print(f'Split {len(files)} files -> {train_dir} ({train_count}) / {test_dir} ({test_count})')
 
 
 if __name__ == '__main__':

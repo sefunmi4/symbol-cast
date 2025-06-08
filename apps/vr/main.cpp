@@ -9,6 +9,10 @@ int main() {
     sc::log(sc::LogLevel::Info, "SymbolCast VR starting");
     sc::InputManager input;
     sc::VRInputManager vrInput;
+    if (!vrInput.connectController()) {
+        sc::log(sc::LogLevel::Error, "Failed to connect VR controller");
+        return 1;
+    }
     sc::ModelRunner model;
     model.loadModel("models/symbolcast-v1.onnx");
 
