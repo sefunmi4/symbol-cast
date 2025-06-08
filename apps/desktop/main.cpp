@@ -15,11 +15,11 @@ int main(int argc, char** argv) {
     QCommandLineOption rippleMaxOpt({"m", "ripple-max"},
         "Maximum ripple radius", "radius", "80.0");
     QCommandLineOption rippleColorOpt({"c", "ripple-color"},
-        "Ripple color (hex)", "color", "#ffffff96");
+        "Ripple color (hex)", "color", "#fffbe096");
     QCommandLineOption strokeWidthOpt({"w", "stroke-width"},
         "Stroke width", "width", "3");
     QCommandLineOption strokeColorOpt({"s", "stroke-color"},
-        "Stroke color (hex)", "color", "#ffffff");
+        "Stroke color (hex)", "color", "#fffbe0");
     QCommandLineOption fadeRateOpt({"f", "fade-rate"},
         "Stroke fade per frame", "rate", "0.005");
 
@@ -36,10 +36,10 @@ int main(int argc, char** argv) {
     opts.rippleGrowthRate = parser.value(rippleGrowthOpt).toFloat();
     opts.rippleMaxRadius = parser.value(rippleMaxOpt).toFloat();
     opts.rippleColor = QColor(parser.value(rippleColorOpt));
-    if (!opts.rippleColor.isValid()) opts.rippleColor = QColor("#ffffff96");
+    if (!opts.rippleColor.isValid()) opts.rippleColor = QColor("#fffbe096");
     opts.strokeWidth = parser.value(strokeWidthOpt).toInt();
     opts.strokeColor = QColor(parser.value(strokeColorOpt));
-    if (!opts.strokeColor.isValid()) opts.strokeColor = QColor("#ffffff");
+    if (!opts.strokeColor.isValid()) opts.strokeColor = QColor("#fffbe0");
     opts.fadeRate = parser.value(fadeRateOpt).toFloat();
 
     sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");

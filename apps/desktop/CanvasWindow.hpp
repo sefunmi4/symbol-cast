@@ -22,11 +22,11 @@
 struct CanvasWindowOptions {
   float rippleGrowthRate{2.f};
   float rippleMaxRadius{80.f};
-  QColor rippleColor{255, 255, 255, 150};
+  QColor rippleColor{255, 251, 224, 150};
   int strokeWidth{3};
-  QColor strokeColor{170, 170, 170};
+  QColor strokeColor{255, 251, 224};
   float fadeRate{0.005f};
-  QColor backgroundTint{255, 255, 255, 40};
+  QColor backgroundTint{34, 34, 34, 120};
 };
 
 class CanvasWindow : public QWidget {
@@ -280,8 +280,10 @@ protected:
         p.drawPath(s.path);
       }
     }
-    if (!m_predictionPath.isEmpty()) {
-      QPen dashPen(QColor(200, 200, 200), 1, Qt::DashLine);
+    if (!m_predictionPath.isEmpty() && m_predictionOpacity > 0.f) {
+      QColor predColor(200, 200, 200);
+      predColor.setAlphaF(m_predictionOpacity);
+      QPen dashPen(predColor, 1, Qt::DashLine);
       p.setPen(dashPen);
       p.drawPath(m_predictionPath);
     }
@@ -321,6 +323,10 @@ private slots:
                                      return s.opacity <= 0.f;
                                    }),
                     m_strokes.end());
+    if (m_predictionOpacity > 0.f)
+      m_predictionOpacity -= 0.05f;
+    if (m_predictionOpacity < 0.f)
+      m_predictionOpacity = 0.f;
     update();
   }
 
@@ -384,6 +390,7 @@ private:
       pred.addEllipse(box.center(), box.width() / 4.0, box.height() / 4.0);
     }
     m_predictionPath = pred;
+    m_predictionOpacity = 1.f;
   }
 
   sc::InputManager m_input;
@@ -443,6 +450,7 @@ private:
   QShortcut *m_togglePrediction;
   bool m_showPrediction{true};
   QPainterPath m_predictionPath;
+  float m_predictionOpacity{0.f};
   bool m_dragging;
   bool m_resizing;
   bool m_pressPending;
