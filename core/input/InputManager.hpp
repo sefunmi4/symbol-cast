@@ -25,19 +25,26 @@ public:
           m_doubleTapInterval(intervalMs) {}
 
     // Handle a tap event with timestamp in milliseconds. Returns true if
-    // a double tap was detected. A double tap toggles capture on/off.
+    // a double tap was detected. Two taps start capture, a single tap
+    // while capturing stops it.
     bool onTap(uint64_t timestamp) {
         if (timestamp < m_lastTap)
             m_lastTap = std::numeric_limits<uint64_t>::max(); // reset if timestamps go backwards
+
+        if (m_capturing) {
+            // any tap while capturing ends the capture
+            stopCapture();
+            m_lastTap = std::numeric_limits<uint64_t>::max();
+            return false;
+        }
+
         if (m_lastTap != std::numeric_limits<uint64_t>::max() &&
             timestamp - m_lastTap < m_doubleTapInterval) {
-            if (m_capturing)
-                stopCapture();
-            else
-                startCapture();
+            startCapture();
             m_lastTap = std::numeric_limits<uint64_t>::max();
             return true;
         }
+
         m_lastTap = timestamp;
         return false;
     }

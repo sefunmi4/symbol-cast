@@ -24,8 +24,9 @@ struct CanvasWindowOptions {
   float rippleMaxRadius{80.f};
   QColor rippleColor{255, 255, 255, 150};
   int strokeWidth{3};
-  QColor strokeColor{255, 255, 255};
+  QColor strokeColor{170, 170, 170};
   float fadeRate{0.005f};
+  QColor backgroundTint{255, 255, 255, 40};
 };
 
 class CanvasWindow : public QWidget {
@@ -47,6 +48,12 @@ public:
     connect(m_exitEsc, &QShortcut::activated, qApp, &QCoreApplication::quit);
     m_exitCtrlC = new QShortcut(QKeySequence(QStringLiteral("Ctrl+C")), this);
     connect(m_exitCtrlC, &QShortcut::activated, qApp, &QCoreApplication::quit);
+    m_togglePrediction = new QShortcut(QKeySequence(Qt::Key_P), this);
+    connect(m_togglePrediction, &QShortcut::activated, this, [this] {
+      m_showPrediction = !m_showPrediction;
+      if (!m_showPrediction)
+        m_predictionPath = QPainterPath();
+    });
     int w = qEnvironmentVariableIntValue("SC_TRACKPAD_WIDTH");
     int h = qEnvironmentVariableIntValue("SC_TRACKPAD_HEIGHT");
     if (w <= 0)
@@ -56,7 +63,7 @@ public:
     resize(w, h);
     // Instruction label shown when idle
     m_label = new QLabel(
-        tr("Double-tap to start drawing. Draw a symbol, then double-tap again to submit."),
+        tr("Double-tap to start drawing. Draw a symbol, then tap once to submit."),
         this);
     m_label->setStyleSheet("color:#CCCCCC;font-size:12px;");
     m_label->setAlignment(Qt::AlignCenter);
@@ -137,30 +144,33 @@ protected:
     const uint64_t ts =
         static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
     resetIdleTimer();
+    bool wasCapturing = m_input.capturing();
     bool dbl = m_input.onTap(ts);
+    bool nowCapturing = m_input.capturing();
     m_ripples.push_back({event->pos(), 0.f, 1.f});
-    if (dbl) {
+    if (!wasCapturing && nowCapturing) {
       m_pressPending = false;
       m_dragging = false;
-      if (m_input.capturing()) {
-        sc::log(sc::LogLevel::Info, "Capture started");
-        m_strokes.clear();
-        m_strokes.push_back({});
-        m_strokes.back().addPoint(event->pos());
-        m_input.addPoint(event->pos().x(), event->pos().y());
-        sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
-        m_label->hide();
-      } else {
-        sc::log(sc::LogLevel::Info, "Capture ended");
-        onSubmit();
-      }
-    } else if (m_input.capturing()) {
+      sc::log(sc::LogLevel::Info, "Capture started");
+      m_strokes.clear();
+      m_strokes.push_back({});
+      m_strokes.back().addPoint(event->pos());
+      m_input.addPoint(event->pos().x(), event->pos().y());
+      sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
+      m_label->hide();
+      updatePrediction();
+    } else if (wasCapturing && !nowCapturing) {
+      sc::log(sc::LogLevel::Info, "Capture ended");
+      onSubmit();
+      m_predictionPath = QPainterPath();
+    } else if (nowCapturing) {
       if (m_strokes.empty())
         m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
+      updatePrediction();
     }
     update();
   }
@@ -216,6 +226,7 @@ protected:
       m_input.addPoint(event->pos().x(), event->pos().y());
       sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
+      updatePrediction();
     }
     update();
   }
@@ -242,7 +253,7 @@ protected:
                                -m_borderWidth / 2.0, -m_borderWidth / 2.0);
     QPainterPath path;
     path.addRoundedRect(r, 12, 12);
-    p.fillPath(path, QColor(0, 0, 0, 30));
+    p.fillPath(path, m_options.backgroundTint);
     QPen borderPen(QColor(170, 170, 170), m_borderWidth);
     p.setPen(borderPen);
     p.drawPath(path);
@@ -268,6 +279,11 @@ protected:
       } else {
         p.drawPath(s.path);
       }
+    }
+    if (!m_predictionPath.isEmpty()) {
+      QPen dashPen(QColor(200, 200, 200), 1, Qt::DashLine);
+      p.setPen(dashPen);
+      p.drawPath(m_predictionPath);
     }
   }
 
@@ -329,6 +345,47 @@ private:
     return e;
   }
 
+  void updatePrediction() {
+    if (!m_showPrediction || m_input.points().empty()) {
+      m_predictionPath = QPainterPath();
+      return;
+    }
+    sc::ModelRunner runner;
+    if (!runner.loadModel("models/symbolcast-v1.onnx")) {
+      m_predictionPath = QPainterPath();
+      return;
+    }
+    std::string sym = runner.run(m_input.points());
+    if (sym.empty()) {
+      m_predictionPath = QPainterPath();
+      return;
+    }
+    float minX = m_input.points()[0].x;
+    float minY = m_input.points()[0].y;
+    float maxX = minX;
+    float maxY = minY;
+    for (const auto &pt : m_input.points()) {
+      minX = std::min(minX, pt.x);
+      minY = std::min(minY, pt.y);
+      maxX = std::max(maxX, pt.x);
+      maxY = std::max(maxY, pt.y);
+    }
+    QRectF box(QPointF(minX, minY), QPointF(maxX, maxY));
+    box.adjust(-10, -10, 10, 10);
+    QPainterPath pred;
+    if (sym == "triangle") {
+      pred.moveTo(box.center().x(), box.top());
+      pred.lineTo(box.bottomRight());
+      pred.lineTo(box.bottomLeft());
+      pred.closeSubpath();
+    } else if (sym == "square") {
+      pred.addRect(box);
+    } else if (sym == "dot") {
+      pred.addEllipse(box.center(), box.width() / 4.0, box.height() / 4.0);
+    }
+    m_predictionPath = pred;
+  }
+
   sc::InputManager m_input;
   QLabel *m_label;
   QPushButton *m_closeBtn;
@@ -383,6 +440,9 @@ private:
   QTimer *m_idleTimer;
   QShortcut *m_exitEsc;
   QShortcut *m_exitCtrlC;
+  QShortcut *m_togglePrediction;
+  bool m_showPrediction{true};
+  QPainterPath m_predictionPath;
   bool m_dragging;
   bool m_resizing;
   bool m_pressPending;
