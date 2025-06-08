@@ -128,12 +128,15 @@ protected:
       setGeometry(r);
       return;
     }
-    m_ripples.push_back({event->pos(), 0.f, 1.f});
-    if (m_input.capturing()) {
-      m_points.push_back(event->pos());
-      m_input.addPoint(event->pos().x(), event->pos().y());
-    }
     update();
+  }
+  void mouseReleaseEvent(QMouseEvent* event) override {
+    Q_UNUSED(event);
+    if (m_input.capturing()) {
+        m_input.clear();
+        m_points.clear();
+        update();
+    }
   }
   void mouseReleaseEvent(QMouseEvent *event) override {
     if (event->button() == Qt::LeftButton) {
