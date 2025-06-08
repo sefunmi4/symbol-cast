@@ -162,6 +162,16 @@ Pull requests are welcome! For major changes, please open an issue to discuss wh
 
 Continuous integration builds and tests the project on Linux, macOS and Windows via GitHub Actions.
 
+#### Contributor Tasks
+
+The following items are open for community contributions:
+
+- Expand the dataset with more symbols and capture utilities.
+- Document VR controller setup with OpenXR.
+- Improve the CI matrix with sanitizer builds.
+- Add a GUI for easier data collection.
+
+
 ---
 
 ### 📜 License
@@ -174,9 +184,3 @@ This project is licensed under the MIT License.
 
 SymbolCast is more than an input engine — it’s a step toward a world where users interact with their OS like spellcasters, using gestures, voice, and intention. Whether on a desktop or in virtual reality, SymbolCast reimagines computing as a symbolic dialogue between human and machine.
 
-## TODO Before Reddit Release
-
-<!-- TODO: Expand dataset with more symbols and capture utilities -->
-- Document VR controller setup with OpenXR
-- Improve CI matrix with sanitizer builds
-- Add GUI for easier data collection
