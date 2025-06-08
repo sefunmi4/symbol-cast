@@ -60,6 +60,11 @@ make
 ```
 An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Double tap again to submit the glowing trace for recognition.
 Lifting your finger while drawing clears the current trace so you can reposition and start a new one without leaving drawing mode.
+### Configuration
+
+SymbolCast loads command mappings from `config/commands.json` when it starts.
+Edit this file to change which command is triggered for each recognized symbol.
+
 
 An overlay window sized to your trackpad will appear with rounded corners and a thin border. Instructions are shown in light gray until you start drawing. You can drag the window by pressing and then moving while capture is off (dragging only begins after you move, so double taps won't shift the window) or resize it by grabbing an edge. Your system cursor disappears inside the overlay, and any finger motion creates a fading ripple. Double tap (or double click) to begin drawing; a white glowing trace follows your finger and gradually fades away so you can write multi-stroke symbols. Double tap again to submit the trace for recognition. The instructions reappear after a few seconds of inactivity. Press **Esc** or **Ctrl+C** at any time to exit. The console logs when capture starts, each point is recorded, and when a symbol is detected.
 
