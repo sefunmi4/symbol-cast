@@ -23,7 +23,8 @@ class CanvasWindow : public QWidget {
 public:
   explicit CanvasWindow(QWidget *parent = nullptr)
       : QWidget(parent), m_dragging(false), m_resizing(false),
-        m_resizeEdges(0), m_borderWidth(2) {
+        m_pressPending(false), m_resizeEdges(0), m_borderWidth(2) {
+
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                    Qt::WindowStaysOnTopHint);
@@ -116,10 +117,9 @@ protected:
         return;
       }
       if (!m_input.capturing()) {
-        sc::log(sc::LogLevel::Info, "Drag start");
-        m_dragging = true;
+        m_pressPending = true;
+        m_pressPos = event->globalPos();
         m_dragPos = event->globalPos() - frameGeometry().topLeft();
-        return;
       }
     }
 
@@ -129,6 +129,8 @@ protected:
     bool dbl = m_input.onTap(ts);
     m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (dbl) {
+      m_pressPending = false;
+      m_dragging = false;
       if (m_input.capturing()) {
         sc::log(sc::LogLevel::Info, "Capture started");
         m_strokes.clear();
@@ -151,10 +153,6 @@ protected:
     update();
   }
   void mouseMoveEvent(QMouseEvent *event) override {
-    if (m_dragging) {
-      move(event->globalPos() - m_dragPos);
-      return;
-    }
     if (m_resizing) {
       QPoint delta = event->globalPos() - m_originPos;
       QRect r = m_origRect;
@@ -323,8 +321,10 @@ private:
   QShortcut *m_exitCtrlC;
   bool m_dragging;
   bool m_resizing;
+  bool m_pressPending;
   int m_resizeEdges;
   QPoint m_dragPos;
+  QPoint m_pressPos;
   QPoint m_originPos;
   QRect m_origRect;
   const int m_borderWidth;
