@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
 
     parser.process(app);
 
-    CanvasWindow::Options opts;
+    CanvasWindowOptions opts;
     opts.rippleGrowthRate = parser.value(rippleGrowthOpt).toFloat();
     opts.rippleMaxRadius = parser.value(rippleMaxOpt).toFloat();
     opts.rippleColor = QColor(parser.value(rippleColorOpt));

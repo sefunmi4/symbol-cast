@@ -19,19 +19,20 @@
 #include <algorithm>
 #include <vector>
 
+struct CanvasWindowOptions {
+  float rippleGrowthRate{2.f};
+  float rippleMaxRadius{80.f};
+  QColor rippleColor{255, 255, 255, 150};
+  int strokeWidth{3};
+  QColor strokeColor{255, 255, 255};
+  float fadeRate{0.005f};
+};
+
 class CanvasWindow : public QWidget {
   Q_OBJECT
 public:
-  struct Options {
-    float rippleGrowthRate{2.f};
-    float rippleMaxRadius{80.f};
-    QColor rippleColor{255, 255, 255, 150};
-    int strokeWidth{3};
-    QColor strokeColor{255, 255, 255};
-    float fadeRate{0.005f};
-  };
 
-  explicit CanvasWindow(const Options &opts = Options(), QWidget *parent = nullptr)
+  explicit CanvasWindow(const CanvasWindowOptions &opts = CanvasWindowOptions(), QWidget *parent = nullptr)
       : QWidget(parent), m_options(opts), m_dragging(false), m_resizing(false),
         m_pressPending(false), m_resizeEdges(0), m_borderWidth(2) {
     setAttribute(Qt::WA_TranslucentBackground);
@@ -376,7 +377,7 @@ private:
     }
   };
   std::vector<Stroke> m_strokes;
-  Options m_options;
+  CanvasWindowOptions m_options;
   std::vector<Ripple> m_ripples;
   QTimer *m_timer;
   QTimer *m_idleTimer;
