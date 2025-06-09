@@ -97,10 +97,10 @@ Use this to capture detailed events when troubleshooting gesture input or model 
 Use `scripts/track_404.py` to find frequently requested paths that return 404.
 The script strips query parameters and anonymizes any digits so personal data
 is not leaked. Multiple log files can be analyzed at once and gzipped logs are
-supported.
+supported. Results may also be written to a file using ``-o``.
 
 ```bash
-python scripts/track_404.py access.log other.log.gz -m 10 -n 20
+python scripts/track_404.py access.log other.log.gz -m 10 -n 20 -o results.txt
 ```
 The options control the minimum number of hits (`-m`) and how many results to
 display (`-n`, `0` for all). Paths containing numbers are reported with
