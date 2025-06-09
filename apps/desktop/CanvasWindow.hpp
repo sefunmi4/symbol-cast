@@ -128,7 +128,7 @@ protected:
     if (event->button() == Qt::LeftButton) {
       int edges = edgesForPos(event->pos());
       if (edges != EdgeNone) {
-        sc::log(sc::LogLevel::Info, "Resize start");
+        SC_LOG(sc::LogLevel::Info, "Resize start");
         m_resizing = true;
         m_resizeEdges = edges;
         m_originPos = event->globalPos();
@@ -152,16 +152,16 @@ protected:
     if (!wasCapturing && nowCapturing) {
       m_pressPending = false;
       m_dragging = false;
-      sc::log(sc::LogLevel::Info, "Capture started");
+      SC_LOG(sc::LogLevel::Info, "Capture started");
       m_strokes.clear();
       m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
-      sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
+      SC_LOG(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
       updatePrediction();
     } else if (wasCapturing && !nowCapturing) {
-      sc::log(sc::LogLevel::Info, "Capture ended");
+      SC_LOG(sc::LogLevel::Info, "Capture ended");
       onSubmit();
       m_predictionPath = QPainterPath();
     } else if (nowCapturing) {
@@ -169,7 +169,7 @@ protected:
         m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
-      sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
+      SC_LOG(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
       updatePrediction();
     }
@@ -196,7 +196,7 @@ protected:
     }
     if (m_pressPending && (event->buttons() & Qt::LeftButton)) {
       if ((event->globalPos() - m_pressPos).manhattanLength() > 3) {
-        sc::log(sc::LogLevel::Info, "Drag start");
+        SC_LOG(sc::LogLevel::Info, "Drag start");
         m_dragging = true;
         m_pressPending = false;
       }
@@ -225,7 +225,7 @@ protected:
         m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
-      sc::log(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
+      SC_LOG(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
       updatePrediction();
     }
@@ -234,9 +234,9 @@ protected:
   void mouseReleaseEvent(QMouseEvent *event) override {
     if (event->button() == Qt::LeftButton) {
       if (m_dragging)
-        sc::log(sc::LogLevel::Info, "Drag end");
+        SC_LOG(sc::LogLevel::Info, "Drag end");
       if (m_resizing)
-        sc::log(sc::LogLevel::Info, "Resize end");
+        SC_LOG(sc::LogLevel::Info, "Resize end");
       m_dragging = false;
       m_resizing = false;
       m_pressPending = false;
@@ -304,12 +304,12 @@ private slots:
       return;
     sc::ModelRunner runner;
     if (!runner.loadModel("models/symbolcast-v1.onnx")) {
-      sc::log(sc::LogLevel::Error, "Failed to load model");
+      SC_LOG(sc::LogLevel::Error, "Failed to load model");
       return;
     }
     auto sym = runner.run(m_input.points());
     auto cmd = runner.commandForSymbol(sym);
-    sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + sym +
+    SC_LOG(sc::LogLevel::Info, std::string("Detected symbol: ") + sym +
                                      ", command: " + cmd);
     m_input.clear();
     m_detectionRect = QRectF();

@@ -82,6 +82,15 @@ You can customize the appearance of ripples and strokes:
 ```
 
 An overlay window sized to your trackpad will appear with rounded corners and a thin border. Instructions are shown in light gray until you start drawing. You can drag the window by pressing and then moving while capture is off (dragging only begins after you move, so double taps won't shift the window) or resize it by grabbing an edge. Your system cursor disappears inside the overlay, and any finger motion creates a fading ripple. Double tap (or double click) to begin drawing; a soft yellow trace follows your finger and gradually fades away so you can write multi-stroke symbols. Tap once to submit the trace for recognition. The instructions reappear after a few seconds of inactivity. Press **Esc** or **Ctrl+C** at any time to exit. The console logs when capture starts, each point is recorded, and when a symbol is detected.
+#### Logging
+
+SymbolCast prints timestamped log messages to the console. Control the verbosity with the `SC_LOG_LEVEL` environment variable (`DEBUG`, `INFO`, `WARN`, or `ERROR`). Example:
+
+```bash
+SC_LOG_LEVEL=DEBUG ./symbolcast-desktop
+```
+
+Use this to capture detailed events when troubleshooting gesture input or model issues.
 
 ### Build and run the VR app
 ```bash
