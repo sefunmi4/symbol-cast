@@ -92,6 +92,15 @@ SC_LOG_LEVEL=DEBUG ./symbolcast-desktop
 
 Use this to capture detailed events when troubleshooting gesture input or model issues.
 
+### 404 Error Tracking
+
+`scripts/track_404.py` summarizes repeated 404 responses in any HTTP access log without exposing private details.
+
+```bash
+python scripts/track_404.py /path/to/access.log 10
+```
+Paths exceeding the optional threshold (default: 5) are printed with their hit counts.
+
 ### Build and run the VR app
 ```bash
 make symbolcast-vr
