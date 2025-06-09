@@ -11,9 +11,9 @@ int main(int argc, char** argv) {
     parser.addHelpOption();
 
     QCommandLineOption rippleGrowthOpt({"g", "ripple-growth"},
-        "Ripple growth per frame", "rate", "2.0");
+        "Ripple growth per frame", "rate", "1.0");
     QCommandLineOption rippleMaxOpt({"m", "ripple-max"},
-        "Maximum ripple radius", "radius", "80.0");
+        "Maximum ripple radius", "radius", "30.0");
     QCommandLineOption rippleColorOpt({"c", "ripple-color"},
         "Ripple color (hex)", "color", "#fffbe096");
     QCommandLineOption strokeWidthOpt({"w", "stroke-width"},

@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.qpp": "cpp",
+        "__node_handle": "cpp",
+        "optional": "cpp"
+    }
+}
