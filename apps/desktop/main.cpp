@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     if (!opts.detectionColor.isValid())
         opts.detectionColor = QColor("#ffffff66");
 
-    sc::log(sc::LogLevel::Info, "SymbolCast Desktop starting");
+    SC_LOG(sc::LogLevel::Info, "SymbolCast Desktop starting");
     CanvasWindow win(opts);
     win.show();
     return app.exec();

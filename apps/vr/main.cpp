@@ -6,11 +6,11 @@
 // TODO: replace placeholder data with actual OpenXR-based capture loop
 
 int main() {
-    sc::log(sc::LogLevel::Info, "SymbolCast VR starting");
+    SC_LOG(sc::LogLevel::Info, "SymbolCast VR starting");
     sc::InputManager input;
     sc::VRInputManager vrInput;
     if (!vrInput.connectController()) {
-        sc::log(sc::LogLevel::Error, "Failed to connect VR controller");
+        SC_LOG(sc::LogLevel::Error, "Failed to connect VR controller");
         return 1;
     }
     sc::ModelRunner model;
@@ -26,10 +26,10 @@ int main() {
     vrInput.stopCapture();
     vrInput.exportCSV("captured_vr_gesture.csv");
 
-    sc::log(sc::LogLevel::Info, "Playing back captured path:");
+    SC_LOG(sc::LogLevel::Info, "Playing back captured path:");
     input.playbackPath();
     // VR path would be processed separately; reuse 2D for model demo
     auto symbol = model.run(input.points());
-    sc::log(sc::LogLevel::Info, std::string("Detected symbol: ") + symbol);
+    SC_LOG(sc::LogLevel::Info, std::string("Detected symbol: ") + symbol);
     return 0;
 }
