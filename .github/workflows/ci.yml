@@ -18,6 +18,18 @@ jobs:
         with:
           path: build
           key: ${{ runner.os }}-build-${{ hashFiles('**/CMakeLists.txt') }}
+      - name: Install Qt
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y qtbase5-dev
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew update
+            brew install qt@5
+          elif [[ "$RUNNER_OS" == "Windows" ]]; then
+            choco install qt5 -y
+          fi
       - name: Configure
         run: cmake -S . -B build
       - name: Build
