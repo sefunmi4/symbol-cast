@@ -92,20 +92,22 @@ SC_LOG_LEVEL=DEBUG ./symbolcast-desktop
 
 Use this to capture detailed events when troubleshooting gesture input or model issues.
 
-### 404 Error Tracking
+### HTTP Error Tracking
 
-Use `scripts/track_404.py` to find frequently requested paths that return 404.
-The script strips query parameters and anonymizes any digits so personal data
-is not leaked. Multiple log files can be analyzed at once and gzipped logs are
-supported. Results may also be written to a file using ``-o``.
+Use `scripts/track_404.py` to find frequently requested paths that return a
+specific status code (404 by default). The script strips query parameters and
+anonymizes any digits so personal data is not leaked. Multiple log files can be
+analyzed at once and gzipped logs are supported. Results may also be written to
+a file using ``-o``.
 
 ```bash
-python scripts/track_404.py access.log other.log.gz -m 10 -n 20 -o results.txt
+python scripts/track_404.py access.log other.log.gz -m 10 -n 20 \
+    -s 404 -o results.txt
 ```
-The options control the minimum number of hits (`-m`) and how many results to
-display (`-n`, `0` for all). Paths containing numbers are reported with
-`<num>` placeholders to avoid exposing IDs. Pass `-` in place of a filename to
-read from standard input.
+The options control the minimum number of hits (`-m`), how many results to
+display (`-n`, `0` for all), and which status code to track (`-s`). Paths
+containing numbers are reported with `<num>` placeholders to avoid exposing
+IDs. Pass `-` in place of a filename to read from standard input.
 
 ### Build and run the VR app
 ```bash
