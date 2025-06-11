@@ -54,4 +54,8 @@ add_executable(test_vr_capture tests/test_vr_capture.cpp)
 target_link_libraries(test_vr_capture PRIVATE symbolcast_core)
 add_test(NAME TestVRCapture COMMAND test_vr_capture)
 
+add_executable(test_dynamic_recognizer tests/test_dynamic_recognizer.cpp)
+target_link_libraries(test_dynamic_recognizer PRIVATE symbolcast_core)
+add_test(NAME TestDynamicRecognizer COMMAND test_dynamic_recognizer)
+
 enable_testing()

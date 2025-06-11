@@ -2,6 +2,7 @@
 #define CANVASWINDOW_HPP
 #include "core/input/InputManager.hpp"
 #include "core/recognition/ModelRunner.hpp"
+#include "core/recognition/GestureRecognizer.hpp"
 #include "utils/Logger.hpp"
 #include <QCoreApplication>
 #include <QDateTime>
@@ -15,6 +16,8 @@
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QTimer>
+#include <QInputDialog>
+#include <QLineEdit>
 #include <QWidget>
 #include <algorithm>
 #include <vector>
@@ -55,6 +58,20 @@ public:
       if (!m_showPrediction)
         m_predictionPath = QPainterPath();
     });
+    m_trainShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+T")), this);
+    connect(m_trainShortcut, &QShortcut::activated, this,
+            &CanvasWindow::onTrainGesture);
+    m_undoShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+Z")), this);
+    connect(m_undoShortcut, &QShortcut::activated, this, [this] {
+      if (m_recognizer.undo())
+        m_recognizer.saveProfile("data/user_gestures.json");
+    });
+    m_redoShortcut = new QShortcut(QKeySequence(QStringLiteral("Ctrl+Y")), this);
+    connect(m_redoShortcut, &QShortcut::activated, this, [this] {
+      if (m_recognizer.redo())
+        m_recognizer.saveProfile("data/user_gestures.json");
+    });
+    m_recognizer.loadProfile("data/user_gestures.json");
     int w = qEnvironmentVariableIntValue("SC_TRACKPAD_WIDTH");
     int h = qEnvironmentVariableIntValue("SC_TRACKPAD_HEIGHT");
     if (w <= 0)
@@ -302,18 +319,41 @@ private slots:
   void onSubmit() {
     if (m_input.points().empty())
       return;
-    sc::ModelRunner runner;
-    if (!runner.loadModel("models/symbolcast-v1.onnx")) {
-      SC_LOG(sc::LogLevel::Error, "Failed to load model");
-      return;
+    std::string cmd = m_recognizer.commandForGesture(m_input.points());
+    if (cmd.empty()) {
+      sc::ModelRunner runner;
+      if (!runner.loadModel("models/symbolcast-v1.onnx")) {
+        SC_LOG(sc::LogLevel::Error, "Failed to load model");
+        return;
+      }
+      auto sym = runner.run(m_input.points());
+      cmd = runner.commandForSymbol(sym);
     }
-    auto sym = runner.run(m_input.points());
-    auto cmd = runner.commandForSymbol(sym);
-    SC_LOG(sc::LogLevel::Info, std::string("Detected symbol: ") + sym +
-                                     ", command: " + cmd);
+    SC_LOG(sc::LogLevel::Info, std::string("Detected command: ") + cmd);
     m_input.clear();
     m_detectionRect = QRectF();
     m_idleTimer->start();
+    update();
+  }
+  void onTrainGesture() {
+    if (m_input.points().empty())
+      return;
+    bool ok = false;
+    QString label = QInputDialog::getText(this, tr("Label Gesture"), tr("Label:"),
+                                         QLineEdit::Normal, QString(), &ok);
+    if (!ok || label.isEmpty())
+      return;
+    QString cmd = QInputDialog::getText(this, tr("Command"), tr("Command:"),
+                                        QLineEdit::Normal, QString(), &ok);
+    if (!ok)
+      return;
+    m_recognizer.addSample(label.toStdString(), m_input.points(),
+                           cmd.toStdString());
+    m_recognizer.saveProfile("data/user_gestures.json");
+    m_input.clear();
+    m_strokes.clear();
+    m_predictionPath = QPainterPath();
+    m_detectionRect = QRectF();
     update();
   }
   void onFrame() {
@@ -460,6 +500,10 @@ private:
   QShortcut *m_exitEsc;
   QShortcut *m_exitCtrlC;
   QShortcut *m_togglePrediction;
+  QShortcut *m_trainShortcut;
+  QShortcut *m_undoShortcut;
+  QShortcut *m_redoShortcut;
+  sc::GestureRecognizer m_recognizer;
   bool m_showPrediction{true};
   QPainterPath m_predictionPath;
   float m_predictionOpacity{0.f};
