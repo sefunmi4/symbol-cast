@@ -157,6 +157,7 @@ python visualize_gesture.py ../../data/labeled/triangle_01.csv
 ```
 The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
 version control).
+For a detailed overview of the training workflow, see [docs/model_training.md](docs/model_training.md).
 
 
 ---
