@@ -58,4 +58,8 @@ add_executable(test_dynamic_recognizer tests/test_dynamic_recognizer.cpp)
 target_link_libraries(test_dynamic_recognizer PRIVATE symbolcast_core)
 add_test(NAME TestDynamicRecognizer COMMAND test_dynamic_recognizer)
 
+add_executable(test_hybrid_recognizer tests/test_hybrid_recognizer.cpp)
+target_link_libraries(test_hybrid_recognizer PRIVATE symbolcast_core)
+add_test(NAME TestHybridRecognizer COMMAND test_hybrid_recognizer)
+
 enable_testing()

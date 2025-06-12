@@ -10,6 +10,7 @@ Designed to feel like a native extension of the OS, SymbolCast supports both 2D 
 
 - 🖱️ **Multi-input Drawing**: Trackpad, mouse, keyboard stroke path, or VR controller.
 - 🧠 **Model Training Pipeline**: Collect labeled symbol data and train recognition models.
+- 🧩 **Hybrid Recognition**: Built-in core model plus live-trained custom gestures.
 - ⚙️ **Command Mapping**: Bind recognized symbols to OS commands, macros, or scripts.
 - 🧑‍💻 **Native C++ Core**: Built using Qt, OpenXR, and ONNX Runtime for fast performance and full control.
 - 🌐 **Cross-Platform**: Designed for desktop and VR environments with future OS-level integration.
