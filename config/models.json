@@ -1,0 +1,4 @@
+{
+  "shape_model": "models/shape_model.onnx",
+  "letter_model": "models/letter_model.onnx"
+}

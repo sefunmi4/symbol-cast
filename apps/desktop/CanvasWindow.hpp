@@ -2,6 +2,7 @@
 #define CANVASWINDOW_HPP
 #include "core/input/InputManager.hpp"
 #include "core/recognition/ModelRunner.hpp"
+#include "core/recognition/RecognizerRouter.hpp"
 #include "core/recognition/GestureRecognizer.hpp"
 #include "utils/Logger.hpp"
 #include <QCoreApplication>
@@ -18,6 +19,7 @@
 #include <QTimer>
 #include <QInputDialog>
 #include <QLineEdit>
+#include <QString>
 #include <QWidget>
 #include <algorithm>
 #include <vector>
@@ -82,7 +84,7 @@ public:
     resize(w, h);
     // Instruction label shown when idle
     m_label = new QLabel(
-        tr("Double-tap to start drawing. Draw a symbol, then tap once to submit."),
+        tr("Double-tap to start. Single-tap ends symbol. Double-tap submits."),
         this);
     m_label->setStyleSheet("color:#CCCCCC;font-size:12px;");
     m_label->setAlignment(Qt::AlignCenter);
@@ -125,6 +127,15 @@ public:
             QOverload<>::of(&CanvasWindow::onFrame));
     // higher refresh rate for smoother drawing
     m_timer->start(10);
+
+    m_hoverLabel = new QLabel(this);
+    m_hoverLabel->setStyleSheet("color:#FFFFFF;background:rgba(0,0,0,80);"
+                                "font-size:10px;border-radius:4px;padding:2px;");
+    m_hoverLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_hoverLabel->hide();
+    m_hoverTimer = new QTimer(this);
+    m_hoverTimer->setSingleShot(true);
+    connect(m_hoverTimer, &QTimer::timeout, m_hoverLabel, &QWidget::hide);
   }
 
   struct Ripple {
@@ -164,30 +175,38 @@ protected:
         static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
     resetIdleTimer();
     bool wasCapturing = m_input.capturing();
-    bool dbl = m_input.onTap(ts);
+    sc::TapAction act = m_input.onTapSequence(ts);
     bool nowCapturing = m_input.capturing();
     m_ripples.push_back({event->pos(), 0.f, 1.f});
-    if (!wasCapturing && nowCapturing) {
+    if (act == sc::TapAction::StartSequence) {
       m_pressPending = false;
       m_dragging = false;
-      SC_LOG(sc::LogLevel::Info, "Capture started");
       m_strokes.clear();
       m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
-      SC_LOG(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
+      SC_LOG(sc::LogLevel::Info, "Sequence start");
       updatePrediction();
-    } else if (wasCapturing && !nowCapturing) {
-      SC_LOG(sc::LogLevel::Info, "Capture ended");
+    } else if (act == sc::TapAction::EndSymbol) {
       onSubmit();
-      m_predictionPath = QPainterPath();
+      m_input.clear();
+      m_strokes.clear();
+    } else if (act == sc::TapAction::EndSequence) {
+      onSubmit();
+      m_input.clear();
+      m_strokes.clear();
+      m_label->show();
+      SC_LOG(sc::LogLevel::Info, "Sequence end");
+    } else if (act == sc::TapAction::LabelSymbol) {
+      onTrainGesture();
+    } else if (act == sc::TapAction::RecordStream) {
+      SC_LOG(sc::LogLevel::Info, "Record stream" );
     } else if (nowCapturing) {
       if (m_strokes.empty())
         m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
-      SC_LOG(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
       m_label->hide();
       updatePrediction();
     }
@@ -322,13 +341,10 @@ private slots:
       return;
     std::string cmd = m_recognizer.commandForGesture(m_input.points());
     if (cmd.empty()) {
-      sc::ModelRunner runner;
-      if (!runner.loadModel("models/symbolcast-v1.onnx")) {
-        SC_LOG(sc::LogLevel::Error, "Failed to load model");
-        return;
-      }
-      auto sym = runner.run(m_input.points());
-      cmd = runner.commandForSymbol(sym);
+      auto sym = m_router.recognize(m_input.points());
+      cmd = m_router.commandForSymbol(sym);
+      if (!sym.empty())
+        showHoverFeedback(QString::fromStdString(sym));
     }
     SC_LOG(sc::LogLevel::Info, std::string("Detected command: ") + cmd);
     m_input.clear();
@@ -428,16 +444,12 @@ private:
       m_detectionRect = QRectF();
       return;
     }
-    sc::ModelRunner runner;
-    if (!runner.loadModel("models/symbolcast-v1.onnx")) {
-      m_predictionPath = QPainterPath();
-      return;
-    }
-    std::string sym = runner.run(m_input.points());
+    std::string sym = m_router.recognize(m_input.points());
     if (sym.empty()) {
       m_predictionPath = QPainterPath();
       return;
     }
+    showHoverFeedback(QString::fromStdString(sym));
     float minX = m_input.points()[0].x;
     float minY = m_input.points()[0].y;
     float maxX = minX;
@@ -464,6 +476,14 @@ private:
     }
     m_predictionPath = pred;
     m_predictionOpacity = 1.f;
+  }
+
+  void showHoverFeedback(const QString &text) {
+    m_hoverLabel->setText(text);
+    m_hoverLabel->adjustSize();
+    m_hoverLabel->move(width() - m_hoverLabel->width() - 10, 10);
+    m_hoverLabel->show();
+    m_hoverTimer->start(2000);
   }
 
   sc::InputManager m_input;
@@ -525,6 +545,9 @@ private:
   QShortcut *m_undoShortcut;
   QShortcut *m_redoShortcut;
   sc::GestureRecognizer m_recognizer;
+  sc::RecognizerRouter m_router;
+  QLabel *m_hoverLabel;
+  QTimer *m_hoverTimer;
   bool m_showPrediction{true};
   QPainterPath m_predictionPath;
   float m_predictionOpacity{0.f};
