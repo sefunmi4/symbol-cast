@@ -17,12 +17,22 @@ struct Point {
 };
 
 // InputManager records gesture points for later recognition or training.
+enum class TapAction {
+    None,
+    StartSequence,
+    EndSymbol,
+    EndSequence,
+    LabelSymbol,
+    RecordStream
+};
+
 class InputManager {
 public:
     explicit InputManager(uint64_t intervalMs = 300)
         : m_capturing(false),
           m_lastTap(std::numeric_limits<uint64_t>::max()),
-          m_doubleTapInterval(intervalMs) {}
+          m_doubleTapInterval(intervalMs),
+          m_tapCount(0) {}
 
     // Handle a tap event with timestamp in milliseconds. Returns true if
     // a double tap was detected. Two taps start capture, a single tap
@@ -47,6 +57,53 @@ public:
 
         m_lastTap = timestamp;
         return false;
+    }
+
+    TapAction onTapSequence(uint64_t timestamp) {
+        if (timestamp < m_lastTap)
+            m_tapCount = 0;
+
+        if (!m_capturing) {
+            if (m_lastTap != std::numeric_limits<uint64_t>::max() &&
+                timestamp - m_lastTap < m_doubleTapInterval) {
+                startCapture();
+                m_lastTap = std::numeric_limits<uint64_t>::max();
+                m_tapCount = 0;
+                return TapAction::StartSequence;
+            }
+            m_lastTap = timestamp;
+            return TapAction::None;
+        }
+
+        if (timestamp - m_lastTap > m_doubleTapInterval) {
+            m_tapCount = 1;
+        } else {
+            ++m_tapCount;
+        }
+        m_lastTap = timestamp;
+
+        switch (m_tapCount) {
+        case 1:
+            return TapAction::EndSymbol;
+        case 2:
+            stopCapture();
+            m_tapCount = 0;
+            m_lastTap = std::numeric_limits<uint64_t>::max();
+            return TapAction::EndSequence;
+        case 3:
+            stopCapture();
+            m_tapCount = 0;
+            m_lastTap = std::numeric_limits<uint64_t>::max();
+            return TapAction::LabelSymbol;
+        case 4:
+            stopCapture();
+            m_tapCount = 0;
+            m_lastTap = std::numeric_limits<uint64_t>::max();
+            return TapAction::RecordStream;
+        default:
+            m_tapCount = 0;
+            return TapAction::None;
+        }
     }
 
     void startCapture() {
@@ -82,6 +139,7 @@ private:
     uint64_t m_lastTap;
     uint64_t m_doubleTapInterval;
     std::vector<Point> m_points;
+    unsigned m_tapCount;
 };
 
 } // namespace sc

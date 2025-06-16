@@ -121,6 +121,25 @@ public:
         return bestLabel;
     }
 
+    std::pair<std::string, float> predictWithDistance(const std::vector<Point>& pts) const {
+        if (m_samples.empty()) return {std::string(), std::numeric_limits<float>::max()};
+        std::vector<float> feat = toFeature(pts);
+        float bestDist = std::numeric_limits<float>::max();
+        std::string bestLabel;
+        for (const auto& s : m_samples) {
+            float dist = 0.f;
+            for (size_t i = 0; i < feat.size(); ++i) {
+                float d = feat[i] - (i < s.points.size() ? s.points[i] : 0.f);
+                dist += d * d;
+            }
+            if (dist < bestDist) {
+                bestDist = dist;
+                bestLabel = s.label;
+            }
+        }
+        return {bestLabel, bestDist};
+    }
+
     std::string commandForLabel(const std::string& label) const {
         for (const auto& s : m_samples)
             if (s.label == label) return s.command;

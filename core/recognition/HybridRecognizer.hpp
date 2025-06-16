@@ -23,9 +23,9 @@ public:
 
     std::string predict(const std::vector<Point>& pts) const {
         if (!m_custom.empty()) {
-            std::string lbl = m_custom.predict(pts);
-            if (!lbl.empty())
-                return lbl;
+            auto res = m_custom.predictWithDistance(pts);
+            if (!res.first.empty() && res.second < 0.5f)
+                return res.first;
         }
         return m_model.run(pts);
     }

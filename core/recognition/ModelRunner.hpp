@@ -37,7 +37,7 @@ public:
     }
 
     // Returns the predicted symbol name.
-    std::string run(const std::vector<Point>& points) {
+    std::string run(const std::vector<Point>& points) const {
         if (points.empty()) return "";
 #ifdef SC_USE_ONNXRUNTIME
         if (session) {

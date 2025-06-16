@@ -9,8 +9,10 @@ Designed to feel like a native extension of the OS, SymbolCast supports both 2D 
 ## ✨ Features
 
 - 🖱️ **Multi-input Drawing**: Trackpad, mouse, keyboard stroke path, or VR controller.
+- 🌀 **Multi-tap Capture**: Double-tap to start, single-tap to separate symbols, double-tap to submit.
 - 🧠 **Model Training Pipeline**: Collect labeled symbol data and train recognition models.
 - 🧩 **Hybrid Recognition**: Built-in core model plus live-trained custom gestures.
+- 📚 **Modular Model Router**: Routes symbols to shape, letter, or gesture models automatically.
 - ⚙️ **Command Mapping**: Bind recognized symbols to OS commands, macros, or scripts.
 - 🧑‍💻 **Native C++ Core**: Built using Qt, OpenXR, and ONNX Runtime for fast performance and full control.
 - 🌐 **Cross-Platform**: Designed for desktop and VR environments with future OS-level integration.
@@ -60,6 +62,7 @@ make
 ./symbolcast-desktop
 ```
 An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Tap once to submit the glowing trace for recognition.
+Use single taps to separate symbols while recording and double tap again to finish the sequence.
 Lifting your finger while drawing clears the current trace so you can reposition and start a new one without leaving drawing mode.
 
 Press **Ctrl+T** after drawing to label the gesture for training. The dialog also lets you choose how many random variations to generate for one-shot learning.
@@ -68,6 +71,7 @@ Press **Ctrl+T** after drawing to label the gesture for training. The dialog als
 
 SymbolCast loads command mappings from `config/commands.json` when it starts.
 Edit this file to change which command is triggered for each recognized symbol.
+Models are listed in `config/models.json` and loaded on demand by the router.
 
 
 #### Command-line options
@@ -146,6 +150,7 @@ python train_symbol_model.py \
     --augment 10
 ```
 Use `--augment` to synthesize jittered copies of each sample during training. The generated model will be written to `models/symbolcast-v1.onnx`. Run this script before launching the apps so a model is available for inference.
+Additional weights can be placed in the `models/` directory and mapped in `config/models.json` for the router to load.
 
 You can split the labeled dataset into training and test sets with
 `scripts/training/split_dataset.py`:
