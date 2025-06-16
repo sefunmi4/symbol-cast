@@ -62,6 +62,8 @@ make
 An overlay window sized to your trackpad will appear and your system cursor will be hidden inside it. Any finger motion creates a fading ripple so you can practice moving on the pad. Double tap (or double click) to begin drawing; your movements are captured even without holding the button. Tap once to submit the glowing trace for recognition.
 Lifting your finger while drawing clears the current trace so you can reposition and start a new one without leaving drawing mode.
 
+Press **Ctrl+T** after drawing to label the gesture for training. The dialog also lets you choose how many random variations to generate for one-shot learning.
+
 ### Configuration
 
 SymbolCast loads command mappings from `config/commands.json` when it starts.
@@ -141,8 +143,9 @@ cd scripts/training
 python train_symbol_model.py \
     --data_dir ../../data/labeled \
     --output_model ../../models/symbolcast-v1.onnx
+    --augment 10
 ```
-The generated model will be written to `models/symbolcast-v1.onnx`. Run this script before launching the apps so a model is available for inference.
+Use `--augment` to synthesize jittered copies of each sample during training. The generated model will be written to `models/symbolcast-v1.onnx`. Run this script before launching the apps so a model is available for inference.
 
 You can split the labeled dataset into training and test sets with
 `scripts/training/split_dataset.py`:

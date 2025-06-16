@@ -21,6 +21,7 @@
 #include <QWidget>
 #include <algorithm>
 #include <vector>
+#include <random>
 
 struct CanvasWindowOptions {
   float rippleGrowthRate{2.f};
@@ -347,8 +348,28 @@ private slots:
                                         QLineEdit::Normal, QString(), &ok);
     if (!ok)
       return;
+
+    int augment = QInputDialog::getInt(
+        this, tr("Augment Samples"), tr("Extra random copies:"), 0, 0, 100, 1, &ok);
+    if (!ok)
+      augment = 0;
+
     m_recognizer.addSample(label.toStdString(), m_input.points(),
                            cmd.toStdString());
+
+    if (augment > 0) {
+      std::default_random_engine eng(std::random_device{}());
+      std::normal_distribution<float> dist(0.f, 0.02f);
+      for (int i = 0; i < augment; ++i) {
+        std::vector<sc::Point> jittered;
+        jittered.reserve(m_input.points().size());
+        for (const auto &pt : m_input.points()) {
+          jittered.push_back({pt.x + dist(eng), pt.y + dist(eng)});
+        }
+        m_recognizer.addSample(label.toStdString(), jittered, cmd.toStdString());
+      }
+    }
+
     m_recognizer.saveProfile("data/user_gestures.json");
     m_input.clear();
     m_strokes.clear();
