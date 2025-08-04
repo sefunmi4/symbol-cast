@@ -34,6 +34,8 @@ struct CanvasWindowOptions {
   float fadeRate{0.005f};
   QColor backgroundTint{34, 34, 34, 120};
   QColor detectionColor{255, 255, 255, 102};
+  bool fullscreen{false};
+  bool cursorAnimation{false};
 };
 
 class CanvasWindow : public QWidget {
@@ -116,6 +118,11 @@ public:
     connect(m_maxBtn, &QPushButton::clicked, this, [this] {
       isMaximized() ? showNormal() : showMaximized();
     });
+    if (m_options.fullscreen) {
+      m_closeBtn->hide();
+      m_minBtn->hide();
+      m_maxBtn->hide();
+    }
 
     m_idleTimer = new QTimer(this);
     connect(m_idleTimer, &QTimer::timeout, this, [this] { m_label->show(); });
@@ -177,7 +184,8 @@ protected:
     bool wasCapturing = m_input.capturing();
     sc::TapAction act = m_input.onTapSequence(ts);
     bool nowCapturing = m_input.capturing();
-    m_ripples.push_back({event->pos(), 0.f, 1.f});
+    if (m_options.cursorAnimation)
+      m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (act == sc::TapAction::StartSequence) {
       m_pressPending = false;
       m_dragging = false;
@@ -256,7 +264,8 @@ protected:
       else
         setCursor(Qt::BlankCursor);
     }
-    m_ripples.push_back({event->pos(), 0.f, 1.f});
+    if (m_options.cursorAnimation)
+      m_ripples.push_back({event->pos(), 0.f, 1.f});
     if (m_input.capturing()) {
       if (m_strokes.empty())
         m_strokes.push_back({});
@@ -394,15 +403,19 @@ private slots:
     update();
   }
   void onFrame() {
-    for (auto &r : m_ripples) {
-      r.radius += m_options.rippleGrowthRate;
-      r.opacity -= 0.05f;
+    if (m_options.cursorAnimation) {
+      for (auto &r : m_ripples) {
+        r.radius += m_options.rippleGrowthRate;
+        r.opacity -= 0.05f;
+      }
+      m_ripples.erase(
+          std::remove_if(m_ripples.begin(), m_ripples.end(),
+                         [&](const Ripple &r) {
+                           return r.opacity <= 0.f ||
+                                  r.radius >= m_options.rippleMaxRadius;
+                         }),
+          m_ripples.end());
     }
-    m_ripples.erase(
-        std::remove_if(m_ripples.begin(), m_ripples.end(), [&](const Ripple &r) {
-          return r.opacity <= 0.f || r.radius >= m_options.rippleMaxRadius;
-        }),
-        m_ripples.end());
     for (auto &s : m_strokes)
       s.opacity -= m_options.fadeRate;
     m_strokes.erase(std::remove_if(m_strokes.begin(), m_strokes.end(),
