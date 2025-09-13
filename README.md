@@ -169,6 +169,25 @@ The generated model will be written to `models/symbolcast-v1.onnx` (ignored from
 version control).
 
 
+### TrOCR Export and C++ Inference
+
+Use `scripts/export_trocr.py` to convert the [TrOCR](https://huggingface.co/microsoft/trocr-base-stage1)
+model to TorchScript along with its processor files. The traced model and tokenizer can then be
+consumed from C++.
+
+The example `apps/trocr_infer.cpp` shows how to load the TorchScript module with LibTorch,
+preprocess an image using OpenCV, and decode the output tokens using the Hugging Face tokenizers
+library:
+
+```bash
+g++ trocr_infer.cpp -o trocr_infer \
+    -I/path/to/libtorch/include -I/path/to/libtorch/include/torch/csrc/api/include \
+    -L/path/to/libtorch/lib -ltorch_cpu -lc10 \
+    `pkg-config --cflags --libs opencv4` \
+    -ltokenizers
+```
+
+
 ---
 
 ### 📦 Dependencies
