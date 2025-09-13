@@ -180,7 +180,7 @@ Install the script's Python dependencies before running the export script:
 ```bash
 pip install -r scripts/requirements.txt
 # or
-pip install transformers Pillow
+pip install transformers pillow
 ```
 
 The example `apps/trocr_infer.cpp` shows how to load the TorchScript module with LibTorch,
