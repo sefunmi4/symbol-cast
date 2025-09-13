@@ -28,7 +28,7 @@ jobs:
             brew update
             brew install qt@5
           elif [[ "$RUNNER_OS" == "Windows" ]]; then
-            choco install qt5 -y
+            choco install qt5-default -y
           fi
       - name: Configure
         run: cmake -S . -B build
