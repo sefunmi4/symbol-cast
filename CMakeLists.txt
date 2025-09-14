@@ -21,11 +21,10 @@ if(SC_USE_ONNXRUNTIME)
 endif()
 
 # Desktop application
-# Explicitly link against Qt Core and Gui along with Widgets.
-# Some toolchains, particularly MSVC, do not link these
-# dependencies transitively which causes unresolved Qt symbols
-# during linking. Listing them here ensures all required
-# libraries are linked.
+# Explicitly link against Qt Core and Gui along with Widgets. MSVC and
+# other toolchains may not link these dependencies transitively, leading
+# to unresolved Qt symbols (as seen on Windows CI). Listing them here
+# ensures all required libraries are linked.
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets Gui Core)
 if(QT_FOUND)
   set(CMAKE_AUTOMOC ON)
