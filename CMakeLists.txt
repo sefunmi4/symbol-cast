@@ -26,19 +26,20 @@ endif()
 # triggers a flood of "unresolved external symbol" (e.g. LNK2001) errors
 # during linking. Listing them here ensures all required Qt libraries are
 # linked explicitly.
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets Gui Core)
+set(QT_COMPONENTS Core Gui Widgets)
+find_package(QT NAMES Qt6 Qt5 COMPONENTS ${QT_COMPONENTS})
 if(QT_FOUND)
   set(CMAKE_AUTOMOC ON)
-  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Gui Core)
+  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS ${QT_COMPONENTS})
 
   add_executable(symbolcast-desktop
       apps/desktop/main.cpp
       apps/desktop/CanvasWindow.hpp)
   target_link_libraries(symbolcast-desktop PRIVATE
       symbolcast_core
-      Qt${QT_VERSION_MAJOR}::Widgets
+      Qt${QT_VERSION_MAJOR}::Core
       Qt${QT_VERSION_MAJOR}::Gui
-      Qt${QT_VERSION_MAJOR}::Core)
+      Qt${QT_VERSION_MAJOR}::Widgets)
 endif()
 
 # VR application
