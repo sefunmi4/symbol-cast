@@ -58,6 +58,10 @@ add_executable(test_command_mapping tests/test_command_mapping.cpp)
 target_link_libraries(test_command_mapping PRIVATE symbolcast_core)
 add_test(NAME TestCommandMapping COMMAND test_command_mapping)
 
+add_executable(test_model_loading tests/test_model_loading.cpp)
+target_link_libraries(test_model_loading PRIVATE symbolcast_core)
+add_test(NAME TestModelLoading COMMAND test_model_loading)
+
 add_executable(test_timestamp tests/test_timestamp.cpp)
 target_link_libraries(test_timestamp PRIVATE symbolcast_core)
 add_test(NAME TestTimestamp COMMAND test_timestamp)
