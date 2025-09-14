@@ -22,12 +22,21 @@ if(SC_USE_ONNXRUNTIME)
 endif()
 
 # Desktop application
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
+# Explicitly link against Qt Core and Gui along with Widgets.
+# Some toolchains, particularly MSVC, do not link these
+# dependencies transitively which causes unresolved Qt symbols
+# during linking. Listing them here ensures all required
+# libraries are linked.
+find_package(Qt5 REQUIRED COMPONENTS Widgets Gui Core)
 
 add_executable(symbolcast-desktop
     apps/desktop/main.cpp
     apps/desktop/CanvasWindow.hpp)
-target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core Qt5::Widgets)
+target_link_libraries(symbolcast-desktop PRIVATE
+    symbolcast_core
+    Qt5::Widgets
+    Qt5::Gui
+    Qt5::Core)
 
 # VR application
 add_executable(symbolcast-vr apps/vr/main.cpp)
