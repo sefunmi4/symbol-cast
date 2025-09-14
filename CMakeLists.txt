@@ -21,11 +21,10 @@ if(SC_USE_ONNXRUNTIME)
 endif()
 
 # Desktop application
-# Explicitly link against Qt Core and Gui along with Widgets. MSVC and
-# other toolchains may not pull these libraries in transitively, which
-# triggers a flood of "unresolved external symbol" (e.g. LNK2001) errors
-# during linking. Listing them here ensures all required Qt libraries are
-# linked explicitly.
+# MSVC and some other toolchains don't always link Qt dependencies
+# transitively, leading to "unresolved external symbol" (LNK2001) errors.
+# Link Core and Gui explicitly alongside Widgets to ensure all required
+# Qt libraries are included.
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Core Gui Widgets)
 if(QT_FOUND)
   set(CMAKE_AUTOMOC ON)
