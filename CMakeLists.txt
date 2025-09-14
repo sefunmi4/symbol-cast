@@ -21,13 +21,21 @@ if(SC_USE_ONNXRUNTIME)
   target_compile_definitions(symbolcast_core INTERFACE SC_USE_ONNXRUNTIME)
 endif()
 
-# Desktop application
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
+# Desktop application (optional)
+# Try to find Qt6 or Qt5 for building the desktop application. If neither
+# is available, the desktop target will be skipped so that the rest of the
+# project can still be configured and built without Qt.
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets QUIET)
+if(QT_FOUND)
+  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
-add_executable(symbolcast-desktop
-    apps/desktop/main.cpp
-    apps/desktop/CanvasWindow.hpp)
-target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core Qt5::Widgets)
+  add_executable(symbolcast-desktop
+      apps/desktop/main.cpp
+      apps/desktop/CanvasWindow.hpp)
+  target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core Qt${QT_VERSION_MAJOR}::Widgets)
+else()
+  message(STATUS "Qt not found; desktop application will not be built")
+endif()
 
 # VR application
 add_executable(symbolcast-vr apps/vr/main.cpp)
