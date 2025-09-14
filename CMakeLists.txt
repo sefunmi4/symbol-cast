@@ -35,11 +35,10 @@ if(QT_FOUND)
   add_executable(symbolcast-desktop
       apps/desktop/main.cpp
       apps/desktop/CanvasWindow.hpp)
-  target_link_libraries(symbolcast-desktop PRIVATE
-      symbolcast_core
-      Qt${QT_VERSION_MAJOR}::Core
-      Qt${QT_VERSION_MAJOR}::Gui
-      Qt${QT_VERSION_MAJOR}::Widgets)
+  target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core)
+  foreach(component ${QT_COMPONENTS})
+    target_link_libraries(symbolcast-desktop PRIVATE Qt${QT_VERSION_MAJOR}::${component})
+  endforeach()
 endif()
 
 # VR application
