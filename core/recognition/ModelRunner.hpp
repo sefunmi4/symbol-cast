@@ -23,6 +23,16 @@ public:
 
     bool loadModel(const std::string& path) {
         m_modelPath = path;
+
+        // Ensure the model file actually exists before proceeding. Without
+        // ONNX Runtime enabled the function previously returned `true`
+        // unconditionally, which meant callers had no way of detecting a
+        // missing model and CI tests expecting a failure would pass
+        // incorrectly.
+        std::ifstream file(path, std::ios::binary);
+        if (!file.good())
+            return false;
+
 #ifdef SC_USE_ONNXRUNTIME
         session.reset();
         Ort::SessionOptions opts;

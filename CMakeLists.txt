@@ -21,11 +21,10 @@ if(SC_USE_ONNXRUNTIME)
 endif()
 
 # Desktop application
-# Explicitly link against Qt Core and Gui along with Widgets. MSVC and
-# other toolchains may not pull these libraries in transitively, which
-# triggers a flood of "unresolved external symbol" (e.g. LNK2001) errors
-# during linking. Listing them here ensures all required Qt libraries are
-# linked explicitly.
+# MSVC and some other toolchains don't always link Qt dependencies
+# transitively, leading to "unresolved external symbol" (LNK2001) errors.
+# Link Core and Gui explicitly alongside Widgets to ensure all required
+# Qt libraries are included.
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Core Gui Widgets)
 if(QT_FOUND)
   set(CMAKE_AUTOMOC ON)
@@ -57,6 +56,10 @@ add_test(NAME TestDoubleTap COMMAND test_double_tap)
 add_executable(test_command_mapping tests/test_command_mapping.cpp)
 target_link_libraries(test_command_mapping PRIVATE symbolcast_core)
 add_test(NAME TestCommandMapping COMMAND test_command_mapping)
+
+add_executable(test_model_loading tests/test_model_loading.cpp)
+target_link_libraries(test_model_loading PRIVATE symbolcast_core)
+add_test(NAME TestModelLoading COMMAND test_model_loading)
 
 add_executable(test_timestamp tests/test_timestamp.cpp)
 target_link_libraries(test_timestamp PRIVATE symbolcast_core)
