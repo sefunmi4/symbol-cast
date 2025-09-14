@@ -47,9 +47,10 @@ cd symbolcast
 ```
 
 ### 2. Build with CMake
-Install Qt (and optionally ONNX Runtime) for your platform. On macOS you can use
-Homebrew: `brew install qt`. On Windows, install Qt via the official
-installer and ensure `qmake` is in your PATH.
+Install Qt (5 or 6) if you wish to build the desktop GUI. The core library and
+tests build without it. On macOS you can use Homebrew: `brew install qt`. On
+Windows, install Qt via the official installer and ensure `qmake` is in your
+PATH.
 
 ```bash
 mkdir build && cd build
@@ -200,7 +201,7 @@ g++ trocr_infer.cpp -o trocr_infer \
 
 ### 📦 Dependencies
 - C++17 or later
-- Qt 6+ (for GUI)
+- Qt 5 or 6 (optional, for GUI)
 - OpenXR / SteamVR (for VR support)
   - install the OpenXR runtime for your headset and make sure the loader
     libraries are discoverable by CMake

@@ -3,7 +3,6 @@ project(SymbolCast LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_AUTOMOC ON)
 
 # Core library (header-only)
 add_library(symbolcast_core INTERFACE)
@@ -27,16 +26,20 @@ endif()
 # dependencies transitively which causes unresolved Qt symbols
 # during linking. Listing them here ensures all required
 # libraries are linked.
-find_package(Qt5 REQUIRED COMPONENTS Widgets Gui Core)
+find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets Gui Core)
+if(QT_FOUND)
+  set(CMAKE_AUTOMOC ON)
+  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Gui Core)
 
-add_executable(symbolcast-desktop
-    apps/desktop/main.cpp
-    apps/desktop/CanvasWindow.hpp)
-target_link_libraries(symbolcast-desktop PRIVATE
-    symbolcast_core
-    Qt5::Widgets
-    Qt5::Gui
-    Qt5::Core)
+  add_executable(symbolcast-desktop
+      apps/desktop/main.cpp
+      apps/desktop/CanvasWindow.hpp)
+  target_link_libraries(symbolcast-desktop PRIVATE
+      symbolcast_core
+      Qt${QT_VERSION_MAJOR}::Widgets
+      Qt${QT_VERSION_MAJOR}::Gui
+      Qt${QT_VERSION_MAJOR}::Core)
+endif()
 
 # VR application
 add_executable(symbolcast-vr apps/vr/main.cpp)
