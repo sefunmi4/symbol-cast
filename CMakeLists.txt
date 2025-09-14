@@ -21,21 +21,22 @@ if(SC_USE_ONNXRUNTIME)
   target_compile_definitions(symbolcast_core INTERFACE SC_USE_ONNXRUNTIME)
 endif()
 
-# Desktop application (optional)
-# Try to find Qt6 or Qt5 for building the desktop application. If neither
-# is available, the desktop target will be skipped so that the rest of the
-# project can still be configured and built without Qt.
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets QUIET)
-if(QT_FOUND)
-  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+# Desktop application
+# Explicitly link against Qt Core and Gui along with Widgets.
+# Some toolchains, particularly MSVC, do not link these
+# dependencies transitively which causes unresolved Qt symbols
+# during linking. Listing them here ensures all required
+# libraries are linked.
+find_package(Qt5 REQUIRED COMPONENTS Widgets Gui Core)
 
-  add_executable(symbolcast-desktop
-      apps/desktop/main.cpp
-      apps/desktop/CanvasWindow.hpp)
-  target_link_libraries(symbolcast-desktop PRIVATE symbolcast_core Qt${QT_VERSION_MAJOR}::Widgets)
-else()
-  message(STATUS "Qt not found; desktop application will not be built")
-endif()
+add_executable(symbolcast-desktop
+    apps/desktop/main.cpp
+    apps/desktop/CanvasWindow.hpp)
+target_link_libraries(symbolcast-desktop PRIVATE
+    symbolcast_core
+    Qt5::Widgets
+    Qt5::Gui
+    Qt5::Core)
 
 # VR application
 add_executable(symbolcast-vr apps/vr/main.cpp)
