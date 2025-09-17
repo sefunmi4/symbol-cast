@@ -26,8 +26,8 @@ int main(int argc, char** argv) {
         "Detection box color (hex)", "color", "#ffffff66");
     QCommandLineOption fullscreenOpt({"F", "fullscreen"},
         "Launch the board fullscreen");
-    QCommandLineOption cursorAnimOpt({"a", "cursor-animation"},
-        "Enable cursor animation");
+    QCommandLineOption disableCursorAnimOpt({"A", "no-cursor-animation"},
+        "Disable cursor animation (enabled by default)");
 
     parser.addOption(rippleGrowthOpt);
     parser.addOption(rippleMaxOpt);
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     parser.addOption(fadeRateOpt);
     parser.addOption(detectionColorOpt);
     parser.addOption(fullscreenOpt);
-    parser.addOption(cursorAnimOpt);
+    parser.addOption(disableCursorAnimOpt);
 
     parser.process(app);
 
@@ -54,7 +54,8 @@ int main(int argc, char** argv) {
     if (!opts.detectionColor.isValid())
         opts.detectionColor = QColor("#ffffff66");
     opts.fullscreen = parser.isSet(fullscreenOpt);
-    opts.cursorAnimation = parser.isSet(cursorAnimOpt);
+    if (parser.isSet(disableCursorAnimOpt))
+        opts.cursorAnimation = false;
 
     SC_LOG(sc::LogLevel::Info, "SymbolCast Desktop starting");
     CanvasWindow win(opts);

@@ -36,7 +36,7 @@ struct CanvasWindowOptions {
   QColor backgroundTint{34, 34, 34, 120};
   QColor detectionColor{255, 255, 255, 102};
   bool fullscreen{false};
-  bool cursorAnimation{false};
+  bool cursorAnimation{true};
 };
 
 class CanvasWindow : public QWidget {
