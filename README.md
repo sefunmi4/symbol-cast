@@ -73,6 +73,9 @@ Press **Ctrl+T** after drawing to label the gesture for training. The dialog als
 SymbolCast loads command mappings from `config/commands.json` when it starts.
 Edit this file to change which command is triggered for each recognized symbol.
 Models are listed in `config/models.json` and loaded on demand by the router.
+After you export a network, update the JSON entries so each symbol points at the
+exact ONNX or TorchScript file you produced (for example,
+`models/symbolcast-v1.onnx` or `models/symbolcast-v1.ts`).
 
 
 #### Command-line options
