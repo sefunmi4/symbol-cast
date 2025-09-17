@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <vector>
 #include <random>
+#include <deque>
 
 struct CanvasWindowOptions {
   float rippleGrowthRate{2.f};
@@ -151,6 +152,11 @@ public:
     float opacity{1.f};
   };
 
+  struct TracePoint {
+    QPointF pos;
+    float life{1.f};
+  };
+
   enum EdgeFlag {
     EdgeNone = 0x0,
     EdgeLeft = 0x1,
@@ -184,8 +190,10 @@ protected:
     bool wasCapturing = m_input.capturing();
     sc::TapAction act = m_input.onTapSequence(ts);
     bool nowCapturing = m_input.capturing();
-    if (m_options.cursorAnimation)
+    if (m_options.cursorAnimation) {
       m_ripples.push_back({event->pos(), 0.f, 1.f});
+      appendCursorTrace(event->pos());
+    }
     if (act == sc::TapAction::StartSequence) {
       m_pressPending = false;
       m_dragging = false;
@@ -264,8 +272,10 @@ protected:
       else
         setCursor(Qt::BlankCursor);
     }
-    if (m_options.cursorAnimation)
+    if (m_options.cursorAnimation) {
       m_ripples.push_back({event->pos(), 0.f, 1.f});
+      appendCursorTrace(event->pos());
+    }
     if (m_input.capturing()) {
       if (m_strokes.empty())
         m_strokes.push_back({});
@@ -312,6 +322,31 @@ protected:
       p.setPen(Qt::NoPen);
       p.setBrush(c);
       p.drawEllipse(r.pos, r.radius, r.radius);
+    }
+    // cursor trace
+    if (m_options.cursorAnimation && m_cursorTrace.size() >= 1) {
+      p.save();
+      for (size_t i = 1; i < m_cursorTrace.size(); ++i) {
+        float life = (m_cursorTrace[i - 1].life + m_cursorTrace[i].life) / 2.f;
+        if (life <= 0.f)
+          continue;
+        QColor col = m_options.strokeColor;
+        col.setAlphaF(std::clamp(life * 0.6f, 0.f, 1.f));
+        QPen tracePen(col, std::max(1.f, m_options.strokeWidth * 0.5f + life));
+        tracePen.setCapStyle(Qt::RoundCap);
+        tracePen.setJoinStyle(Qt::RoundJoin);
+        p.setPen(tracePen);
+        p.drawLine(m_cursorTrace[i - 1].pos, m_cursorTrace[i].pos);
+      }
+      const auto &head = m_cursorTrace.back();
+      if (head.life > 0.f) {
+        QColor headColor = m_options.strokeColor;
+        headColor.setAlphaF(std::clamp(0.4f + head.life * 0.6f, 0.f, 1.f));
+        p.setPen(Qt::NoPen);
+        p.setBrush(headColor);
+        p.drawEllipse(head.pos, 3.0, 3.0);
+      }
+      p.restore();
     }
     // strokes
     for (const auto &s : m_strokes) {
@@ -415,6 +450,10 @@ private slots:
                                   r.radius >= m_options.rippleMaxRadius;
                          }),
           m_ripples.end());
+      for (auto &tp : m_cursorTrace)
+        tp.life -= 0.07f;
+      while (!m_cursorTrace.empty() && m_cursorTrace.front().life <= 0.f)
+        m_cursorTrace.pop_front();
     }
     for (auto &s : m_strokes)
       s.opacity -= m_options.fadeRate;
@@ -499,6 +538,16 @@ private:
     m_hoverTimer->start(2000);
   }
 
+  void appendCursorTrace(const QPointF &pos) {
+    if (!m_cursorTrace.empty() &&
+        (pos - m_cursorTrace.back().pos).manhattanLength() < 1.0)
+      return;
+    m_cursorTrace.push_back({pos, 1.f});
+    constexpr size_t kMaxTracePoints = 80;
+    if (m_cursorTrace.size() > kMaxTracePoints)
+      m_cursorTrace.pop_front();
+  }
+
   sc::InputManager m_input;
   QLabel *m_label;
   QPushButton *m_closeBtn;
@@ -549,6 +598,7 @@ private:
   std::vector<Stroke> m_strokes;
   CanvasWindowOptions m_options;
   std::vector<Ripple> m_ripples;
+  std::deque<TracePoint> m_cursorTrace;
   QTimer *m_timer;
   QTimer *m_idleTimer;
   QShortcut *m_exitEsc;
