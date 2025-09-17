@@ -1,5 +1,6 @@
 {
-    "triangle": "open-settings",
-    "dot": "click",
-    "square": "open-menu"
+    "triangle": "copy",
+    "circle": "paste",
+    "square": "custom",
+    "dot": "paste"
 }

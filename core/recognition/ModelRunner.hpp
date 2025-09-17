@@ -68,14 +68,14 @@ public:
             auto& out = outputTensors.front();
             int64_t idx = out.GetTensorMutableData<int64_t>()[0];
             switch (idx) {
-            case 0: return "dot";
+            case 0: return "circle";
             case 1: return "triangle";
             case 2: return "square";
             default: return "";
             }
         }
 #endif
-        return points.size() > 3 ? "square" : (points.size() > 2 ? "triangle" : "dot");
+        return points.size() > 3 ? "square" : (points.size() > 2 ? "triangle" : "circle");
     }
 
     std::string commandForSymbol(const std::string& symbol) const {
@@ -90,9 +90,10 @@ public:
 private:
     void loadCommands(const std::string& path) {
         m_commands = {
-            {"triangle", "open-settings"},
-            {"dot", "click"},
-            {"square", "open-menu"}
+            {"triangle", "copy"},
+            {"circle", "paste"},
+            {"square", "custom"},
+            {"dot", "paste"}
         };
         std::ifstream in(path);
         if (!in.is_open())
@@ -112,7 +113,10 @@ private:
             size_t endVal = content.find('"', pos + 1);
             if (endVal == std::string::npos) break;
             std::string val = content.substr(pos + 1, endVal - pos - 1);
-            m_commands[key] = val;
+            std::string normalized = (key == "dot") ? "circle" : key;
+            m_commands[normalized] = val;
+            if (normalized == "circle")
+                m_commands["dot"] = val;
             pos = endVal + 1;
         }
     }
