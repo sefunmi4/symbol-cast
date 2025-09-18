@@ -15,16 +15,25 @@
 #include <QLabel>
 #include <QColor>
 #include <QResizeEvent>
+#include <QSize>
 #include <QShortcut>
 #include <QTimer>
 #include <QInputDialog>
 #include <QLineEdit>
+#include <QComboBox>
+#include <QAction>
+#include <QHBoxLayout>
+#include <QMenu>
+#include <QSignalBlocker>
+#include <QToolButton>
+#include <QVBoxLayout>
 #include <QString>
 #include <QWidget>
 #include <algorithm>
 #include <vector>
 #include <random>
 #include <deque>
+#include <unordered_map>
 
 struct CanvasWindowOptions {
   float rippleGrowthRate{2.f};
@@ -144,6 +153,11 @@ public:
     m_hoverTimer = new QTimer(this);
     m_hoverTimer->setSingleShot(true);
     connect(m_hoverTimer, &QTimer::timeout, m_hoverLabel, &QWidget::hide);
+
+    setupMacroControls();
+    setupSettingsMenu();
+    updateMacroPanelGeometry();
+    updateSettingsButtonGeometry();
   }
 
   struct Ripple {
@@ -167,6 +181,11 @@ public:
 
 protected:
   void mousePressEvent(QMouseEvent *event) override {
+    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
+      resetIdleTimer();
+      QWidget::mousePressEvent(event);
+      return;
+    }
     if (event->button() == Qt::LeftButton) {
       int edges = edgesForPos(event->pos());
       if (edges != EdgeNone) {
@@ -247,6 +266,12 @@ protected:
       move(event->globalPos() - m_dragPos);
       return;
     }
+    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
+      resetIdleTimer();
+      setCursor(Qt::ArrowCursor);
+      QWidget::mouseMoveEvent(event);
+      return;
+    }
     if (m_pressPending && (event->buttons() & Qt::LeftButton)) {
       if ((event->globalPos() - m_pressPos).manhattanLength() > 3) {
         SC_LOG(sc::LogLevel::Info, "Drag start");
@@ -288,6 +313,11 @@ protected:
     update();
   }
   void mouseReleaseEvent(QMouseEvent *event) override {
+    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
+      QWidget::mouseReleaseEvent(event);
+      resetIdleTimer();
+      return;
+    }
     if (event->button() == Qt::LeftButton) {
       if (m_dragging)
         SC_LOG(sc::LogLevel::Info, "Drag end");
@@ -302,6 +332,8 @@ protected:
   void resizeEvent(QResizeEvent *event) override {
     QWidget::resizeEvent(event);
     m_label->setGeometry(rect());
+    updateMacroPanelGeometry();
+    updateSettingsButtonGeometry();
   }
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
@@ -385,10 +417,21 @@ private slots:
       return;
     std::string cmd = m_recognizer.commandForGesture(m_input.points());
     if (cmd.empty()) {
-      auto sym = m_router.recognize(m_input.points());
-      cmd = m_router.commandForSymbol(sym);
-      if (!sym.empty())
-        showHoverFeedback(QString::fromStdString(sym));
+      std::string sym = m_router.recognize(m_input.points());
+      if (!sym.empty()) {
+        std::string macroCmd;
+        if (triggerMacro(sym, macroCmd)) {
+          cmd = macroCmd;
+        } else {
+          cmd = m_router.commandForSymbol(sym);
+          if (!cmd.empty())
+            showHoverFeedback(QString::fromStdString(cmd));
+          else
+            showHoverFeedback(QString::fromStdString(sym));
+        }
+      }
+    } else {
+      showHoverFeedback(QString::fromStdString(cmd));
     }
     SC_LOG(sc::LogLevel::Info, std::string("Detected command: ") + cmd);
     m_input.clear();
@@ -470,6 +513,18 @@ private slots:
   }
 
 private:
+  struct MacroBinding {
+    QString id;
+    QString commandDisplay;
+    QString commandAction;
+    QChar character{QChar()};
+  };
+
+  struct MacroUIRow {
+    QComboBox *combo{nullptr};
+    QLabel *charLabel{nullptr};
+  };
+
   void resetIdleTimer() {
     m_idleTimer->stop();
     m_idleTimer->start();
@@ -501,7 +556,19 @@ private:
       m_predictionPath = QPainterPath();
       return;
     }
-    showHoverFeedback(QString::fromStdString(sym));
+    auto bindingIt = m_macroBindings.find(sym);
+    if (bindingIt != m_macroBindings.end() &&
+        (!bindingIt->second.commandDisplay.isEmpty() ||
+         !bindingIt->second.character.isNull())) {
+      QString label = bindingIt->second.commandDisplay.isEmpty()
+                           ? QString::fromStdString(sym)
+                           : bindingIt->second.commandDisplay;
+      if (!bindingIt->second.character.isNull())
+        label += QStringLiteral(" (%1)").arg(bindingIt->second.character);
+      showHoverFeedback(label);
+    } else {
+      showHoverFeedback(QString::fromStdString(sym));
+    }
     float minX = m_input.points()[0].x;
     float minY = m_input.points()[0].y;
     float maxX = minX;
@@ -523,7 +590,7 @@ private:
       pred.closeSubpath();
     } else if (sym == "square") {
       pred.addRect(box);
-    } else if (sym == "dot") {
+    } else if (sym == "circle" || sym == "dot") {
       pred.addEllipse(box.center(), box.width() / 4.0, box.height() / 4.0);
     }
     m_predictionPath = pred;
@@ -546,6 +613,317 @@ private:
     constexpr size_t kMaxTracePoints = 80;
     if (m_cursorTrace.size() > kMaxTracePoints)
       m_cursorTrace.pop_front();
+  }
+
+  void setupMacroControls() {
+    m_macroPanel = new QWidget(this);
+    m_macroPanel->setAttribute(Qt::WA_StyledBackground, true);
+    m_macroPanel->setStyleSheet(
+        "background:rgba(0,0,0,120);border-radius:8px;padding:4px;");
+    m_macroPanel->setCursor(Qt::ArrowCursor);
+
+    auto *layout = new QVBoxLayout(m_macroPanel);
+    layout->setContentsMargins(8, 8, 8, 8);
+    layout->setSpacing(6);
+
+    addMacroRow("triangle", tr("Triangle"), layout);
+    addMacroRow("circle", tr("Circle"), layout);
+    addMacroRow("square", tr("Square"), layout);
+
+    setComboToId("triangle", QStringLiteral("copy"), true);
+    setMacroBinding("triangle", presetBinding(QStringLiteral("copy")));
+
+    setComboToId("circle", QStringLiteral("paste"), true);
+    setMacroBinding("circle", presetBinding(QStringLiteral("paste")));
+
+    setComboToId("square", QStringLiteral("custom"), true);
+    MacroBinding customBinding;
+    customBinding.id = QStringLiteral("custom");
+    customBinding.commandDisplay = tr("Custom");
+    customBinding.character = QChar('?');
+    setMacroBinding("square", customBinding);
+
+    for (auto &entry : m_macroRows) {
+      if (!entry.second.combo)
+        continue;
+      connect(entry.second.combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+              this, [this, symbol = entry.first](int index) {
+                onMacroSelection(symbol, index);
+              });
+    }
+
+    m_macroPanel->hide();
+  }
+
+  void setupSettingsMenu() {
+    m_settingsButton = new QToolButton(this);
+    m_settingsButton->setText(tr("Settings"));
+    m_settingsButton->setPopupMode(QToolButton::InstantPopup);
+    m_settingsButton->setCursor(Qt::ArrowCursor);
+    m_settingsButton->setStyleSheet(
+        "QToolButton { color:#DDDDDD; background:rgba(0,0,0,40); border:1px solid "
+        "rgba(255,255,255,30); border-radius:6px; padding:2px 10px; }"
+        "QToolButton:hover { background:rgba(255,255,255,45); }");
+    m_settingsButton->raise();
+
+    m_settingsMenu = new QMenu(m_settingsButton);
+    m_macroPanelAction =
+        m_settingsMenu->addAction(tr("Show Shape Command Mapping"));
+    connect(m_macroPanelAction, &QAction::triggered, this,
+            &CanvasWindow::toggleMacroPanelVisibility);
+    m_settingsButton->setMenu(m_settingsMenu);
+
+    updateMacroPanelVisibilityAction();
+  }
+
+  void updateSettingsButtonGeometry() {
+    if (!m_settingsButton)
+      return;
+    QSize size = m_settingsButton->sizeHint();
+    int x = std::max(10, width() - size.width() - 20);
+    int y = 6;
+    m_settingsButton->setGeometry(x, y, size.width(), size.height());
+    m_settingsButton->raise();
+  }
+
+  void toggleMacroPanelVisibility() {
+    if (!m_macroPanel)
+      return;
+    if (m_macroPanel->isVisible()) {
+      m_macroPanel->hide();
+    } else {
+      updateMacroPanelGeometry();
+      m_macroPanel->show();
+      m_macroPanel->raise();
+    }
+    updateMacroPanelVisibilityAction();
+  }
+
+  void updateMacroPanelVisibilityAction() {
+    if (!m_macroPanelAction)
+      return;
+    bool visible = m_macroPanel && m_macroPanel->isVisible();
+    if (visible)
+      m_macroPanelAction->setText(tr("Hide Shape Command Mapping"));
+    else
+      m_macroPanelAction->setText(tr("Show Shape Command Mapping"));
+  }
+
+  void addMacroRow(const std::string &symbol, const QString &label,
+                   QVBoxLayout *layout) {
+    QWidget *row = new QWidget(m_macroPanel);
+    auto *rowLayout = new QHBoxLayout(row);
+    rowLayout->setContentsMargins(0, 0, 0, 0);
+    rowLayout->setSpacing(6);
+
+    QLabel *title = new QLabel(label, row);
+    title->setStyleSheet("color:#FFFFFF;font-size:10px;");
+    rowLayout->addWidget(title);
+
+    QComboBox *combo = new QComboBox(row);
+    combo->addItem(tr("Copy (Ctrl+C)"), QStringLiteral("copy"));
+    combo->addItem(tr("Paste (Ctrl+V)"), QStringLiteral("paste"));
+    combo->addItem(tr("Custom..."), QStringLiteral("custom"));
+    combo->setCursor(Qt::ArrowCursor);
+    rowLayout->addWidget(combo, 1);
+
+    QLabel *charLabel = new QLabel(tr("--"), row);
+    charLabel->setStyleSheet("color:#FFFFFF;font-size:10px;");
+    charLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    charLabel->setFixedWidth(28);
+    rowLayout->addWidget(charLabel);
+
+    layout->addWidget(row);
+    m_macroRows[symbol] = {combo, charLabel};
+  }
+
+  void updateMacroPanelGeometry() {
+    if (!m_macroPanel)
+      return;
+    int panelWidth = 220;
+    int x = std::max(10, width() - panelWidth - 20);
+    int y = 40;
+    int panelHeight = m_macroPanel->sizeHint().height();
+    m_macroPanel->setGeometry(x, y, panelWidth, panelHeight);
+    m_macroPanel->raise();
+  }
+
+  void setComboToId(const std::string &symbol, const QString &id,
+                    bool blockSignals = false) {
+    auto it = m_macroRows.find(symbol);
+    if (it == m_macroRows.end() || !it->second.combo)
+      return;
+    QComboBox *combo = it->second.combo;
+    int idx = combo->findData(id);
+    if (idx < 0)
+      return;
+    if (blockSignals) {
+      QSignalBlocker blocker(combo);
+      combo->setCurrentIndex(idx);
+    } else {
+      combo->setCurrentIndex(idx);
+    }
+  }
+
+  void setMacroBinding(const std::string &symbol, const MacroBinding &binding) {
+    m_macroBindings[symbol] = binding;
+    auto it = m_macroRows.find(symbol);
+    if (it != m_macroRows.end() && it->second.charLabel) {
+      QString text = binding.character.isNull()
+                         ? QStringLiteral("--")
+                         : QString(binding.character);
+      it->second.charLabel->setText(text);
+    }
+  }
+
+  MacroBinding currentMacroBinding(const std::string &symbol) const {
+    auto it = m_macroBindings.find(symbol);
+    if (it != m_macroBindings.end())
+      return it->second;
+    return MacroBinding();
+  }
+
+  MacroBinding presetBinding(const QString &id) const {
+    MacroBinding binding;
+    if (id == QStringLiteral("copy")) {
+      binding.id = id;
+      binding.commandDisplay = tr("Copy");
+      binding.commandAction = QStringLiteral("copy");
+      binding.character = QChar('C');
+    } else if (id == QStringLiteral("paste")) {
+      binding.id = id;
+      binding.commandDisplay = tr("Paste");
+      binding.commandAction = QStringLiteral("paste");
+      binding.character = QChar('V');
+    }
+    return binding;
+  }
+
+  void restorePreviousSelection(const std::string &symbol, const QString &id) {
+    if (id.isEmpty())
+      return;
+    setComboToId(symbol, id, true);
+  }
+
+  void onMacroSelection(const std::string &symbol, int index) {
+    auto rowIt = m_macroRows.find(symbol);
+    if (rowIt == m_macroRows.end() || !rowIt->second.combo)
+      return;
+    QComboBox *combo = rowIt->second.combo;
+    QString selectedId = combo->itemData(index).toString();
+    MacroBinding previous = currentMacroBinding(symbol);
+
+    if (selectedId == QStringLiteral("custom")) {
+      bool ok = false;
+      QString defaultCommand = previous.id == QStringLiteral("custom")
+                                   ? previous.commandAction
+                                   : QString();
+      QString commandInput = QInputDialog::getText(
+          this, tr("Custom Command"), tr("Command label:"),
+          QLineEdit::Normal, defaultCommand, &ok);
+      if (!ok) {
+        restorePreviousSelection(symbol, previous.id);
+        return;
+      }
+      commandInput = commandInput.trimmed();
+
+      QString charDefault = (!previous.character.isNull())
+                                ? QString(previous.character)
+                                : QString();
+      QString charInput = QInputDialog::getText(
+          this, tr("Character Mapping"),
+          tr("Character to emit (optional):"), QLineEdit::Normal,
+          charDefault, &ok);
+      if (!ok) {
+        restorePreviousSelection(symbol, previous.id);
+        return;
+      }
+
+      MacroBinding binding;
+      binding.id = QStringLiteral("custom");
+      binding.commandAction = commandInput;
+      binding.commandDisplay = commandInput.isEmpty()
+                                   ? tr("Custom")
+                                   : commandInput;
+      if (!charInput.isEmpty())
+        binding.character = charInput.front();
+      else if (!charDefault.isEmpty())
+        binding.character = charDefault.front();
+      setMacroBinding(symbol, binding);
+
+      if (!binding.commandAction.isEmpty())
+        combo->setItemText(index,
+                           tr("Custom: %1").arg(binding.commandDisplay));
+      else
+        combo->setItemText(index, tr("Custom..."));
+    } else {
+      MacroBinding binding = presetBinding(selectedId);
+      if (binding.id.isEmpty()) {
+        restorePreviousSelection(symbol, previous.id);
+        return;
+      }
+      setMacroBinding(symbol, binding);
+      int customIndex = combo->findData(QStringLiteral("custom"));
+      if (customIndex >= 0)
+        combo->setItemText(customIndex, tr("Custom..."));
+    }
+  }
+
+  bool triggerMacro(const std::string &symbol, std::string &executedCommand) {
+    auto it = m_macroBindings.find(symbol);
+    if (it == m_macroBindings.end())
+      return false;
+    const MacroBinding &binding = it->second;
+    if (binding.id.isEmpty() && binding.commandDisplay.isEmpty() &&
+        binding.commandAction.isEmpty())
+      return false;
+
+    QString charText = binding.character.isNull()
+                           ? QString()
+                           : QString(binding.character);
+    QString message;
+
+    if (binding.id == QStringLiteral("copy")) {
+      QString buffer = charText;
+      if (buffer.isEmpty())
+        buffer = binding.commandAction;
+      if (buffer.isEmpty())
+        buffer = QString::fromStdString(symbol);
+      m_macroBuffer = buffer;
+      message = tr("Copied %1").arg(buffer);
+    } else if (binding.id == QStringLiteral("paste")) {
+      if (m_macroBuffer.isEmpty())
+        message = tr("Paste buffer empty");
+      else
+        message = tr("Pasted %1").arg(m_macroBuffer);
+    } else {
+      if (!binding.commandAction.isEmpty())
+        m_macroBuffer = binding.commandAction;
+      QString displayName = binding.commandDisplay.isEmpty()
+                                ? tr("Custom")
+                                : binding.commandDisplay;
+      message =
+          tr("%1 → %2").arg(QString::fromStdString(symbol), displayName);
+      if (!charText.isEmpty())
+        message += QStringLiteral(" (%1)").arg(charText);
+    }
+
+    executedCommand = binding.commandAction.isEmpty()
+                          ? binding.id.toStdString()
+                          : binding.commandAction.toStdString();
+
+    showHoverFeedback(message);
+    return true;
+  }
+
+  bool isMacroRegion(const QPoint &pos) const {
+    return m_macroPanel && m_macroPanel->isVisible() &&
+           m_macroPanel->geometry().contains(pos);
+  }
+
+  bool isSettingsRegion(const QPoint &pos) const {
+    return m_settingsButton && m_settingsButton->isVisible() &&
+           m_settingsButton->geometry().contains(pos);
   }
 
   sc::InputManager m_input;
@@ -609,6 +987,13 @@ private:
   QShortcut *m_redoShortcut;
   sc::GestureRecognizer m_recognizer;
   sc::RecognizerRouter m_router;
+  QWidget *m_macroPanel{nullptr};
+  QToolButton *m_settingsButton{nullptr};
+  QMenu *m_settingsMenu{nullptr};
+  QAction *m_macroPanelAction{nullptr};
+  std::unordered_map<std::string, MacroUIRow> m_macroRows;
+  std::unordered_map<std::string, MacroBinding> m_macroBindings;
+  QString m_macroBuffer;
   QLabel *m_hoverLabel;
   QTimer *m_hoverTimer;
   bool m_showPrediction{true};
