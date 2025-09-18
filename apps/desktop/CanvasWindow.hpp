@@ -15,13 +15,17 @@
 #include <QLabel>
 #include <QColor>
 #include <QResizeEvent>
+#include <QSize>
 #include <QShortcut>
 #include <QTimer>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QComboBox>
+#include <QAction>
 #include <QHBoxLayout>
+#include <QMenu>
 #include <QSignalBlocker>
+#include <QToolButton>
 #include <QVBoxLayout>
 #include <QString>
 #include <QWidget>
@@ -151,7 +155,9 @@ public:
     connect(m_hoverTimer, &QTimer::timeout, m_hoverLabel, &QWidget::hide);
 
     setupMacroControls();
+    setupSettingsMenu();
     updateMacroPanelGeometry();
+    updateSettingsButtonGeometry();
   }
 
   struct Ripple {
@@ -175,7 +181,7 @@ public:
 
 protected:
   void mousePressEvent(QMouseEvent *event) override {
-    if (isMacroRegion(event->pos())) {
+    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
       resetIdleTimer();
       QWidget::mousePressEvent(event);
       return;
@@ -260,7 +266,7 @@ protected:
       move(event->globalPos() - m_dragPos);
       return;
     }
-    if (isMacroRegion(event->pos())) {
+    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
       resetIdleTimer();
       setCursor(Qt::ArrowCursor);
       QWidget::mouseMoveEvent(event);
@@ -307,7 +313,7 @@ protected:
     update();
   }
   void mouseReleaseEvent(QMouseEvent *event) override {
-    if (isMacroRegion(event->pos())) {
+    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
       QWidget::mouseReleaseEvent(event);
       resetIdleTimer();
       return;
@@ -327,6 +333,7 @@ protected:
     QWidget::resizeEvent(event);
     m_label->setGeometry(rect());
     updateMacroPanelGeometry();
+    updateSettingsButtonGeometry();
   }
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
@@ -645,8 +652,61 @@ private:
               });
     }
 
-    m_macroPanel->show();
-    m_macroPanel->raise();
+    m_macroPanel->hide();
+  }
+
+  void setupSettingsMenu() {
+    m_settingsButton = new QToolButton(this);
+    m_settingsButton->setText(tr("Settings"));
+    m_settingsButton->setPopupMode(QToolButton::InstantPopup);
+    m_settingsButton->setCursor(Qt::ArrowCursor);
+    m_settingsButton->setStyleSheet(
+        "QToolButton { color:#DDDDDD; background:rgba(0,0,0,40); border:1px solid "
+        "rgba(255,255,255,30); border-radius:6px; padding:2px 10px; }"
+        "QToolButton:hover { background:rgba(255,255,255,45); }");
+    m_settingsButton->raise();
+
+    m_settingsMenu = new QMenu(m_settingsButton);
+    m_macroPanelAction =
+        m_settingsMenu->addAction(tr("Show Shape Command Mapping"));
+    connect(m_macroPanelAction, &QAction::triggered, this,
+            &CanvasWindow::toggleMacroPanelVisibility);
+    m_settingsButton->setMenu(m_settingsMenu);
+
+    updateMacroPanelVisibilityAction();
+  }
+
+  void updateSettingsButtonGeometry() {
+    if (!m_settingsButton)
+      return;
+    QSize size = m_settingsButton->sizeHint();
+    int x = std::max(10, width() - size.width() - 20);
+    int y = 6;
+    m_settingsButton->setGeometry(x, y, size.width(), size.height());
+    m_settingsButton->raise();
+  }
+
+  void toggleMacroPanelVisibility() {
+    if (!m_macroPanel)
+      return;
+    if (m_macroPanel->isVisible()) {
+      m_macroPanel->hide();
+    } else {
+      updateMacroPanelGeometry();
+      m_macroPanel->show();
+      m_macroPanel->raise();
+    }
+    updateMacroPanelVisibilityAction();
+  }
+
+  void updateMacroPanelVisibilityAction() {
+    if (!m_macroPanelAction)
+      return;
+    bool visible = m_macroPanel && m_macroPanel->isVisible();
+    if (visible)
+      m_macroPanelAction->setText(tr("Hide Shape Command Mapping"));
+    else
+      m_macroPanelAction->setText(tr("Show Shape Command Mapping"));
   }
 
   void addMacroRow(const std::string &symbol, const QString &label,
@@ -861,6 +921,11 @@ private:
            m_macroPanel->geometry().contains(pos);
   }
 
+  bool isSettingsRegion(const QPoint &pos) const {
+    return m_settingsButton && m_settingsButton->isVisible() &&
+           m_settingsButton->geometry().contains(pos);
+  }
+  
   sc::InputManager m_input;
   QLabel *m_label;
   QPushButton *m_closeBtn;
@@ -923,6 +988,9 @@ private:
   sc::GestureRecognizer m_recognizer;
   sc::RecognizerRouter m_router;
   QWidget *m_macroPanel{nullptr};
+  QToolButton *m_settingsButton{nullptr};
+  QMenu *m_settingsMenu{nullptr};
+  QAction *m_macroPanelAction{nullptr};
   std::unordered_map<std::string, MacroUIRow> m_macroRows;
   std::unordered_map<std::string, MacroBinding> m_macroBindings;
   QString m_macroBuffer;
