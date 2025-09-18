@@ -306,7 +306,12 @@ protected:
         m_strokes.push_back({});
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
-      SC_LOG(sc::LogLevel::Info, "Point " + std::to_string(event->pos().x()) + "," + std::to_string(event->pos().y()));
+      if (static_cast<int>(sc::globalLogLevel()) <=
+          static_cast<int>(sc::LogLevel::Debug)) {
+        SC_LOG(sc::LogLevel::Debug,
+               "Point " + std::to_string(event->pos().x()) + "," +
+                   std::to_string(event->pos().y()));
+      }
       m_label->hide();
       updatePrediction();
     }
