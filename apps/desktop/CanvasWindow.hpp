@@ -420,25 +420,47 @@ private slots:
   void onSubmit() {
     if (m_input.points().empty())
       return;
+    std::string recognizedSymbol;
+    std::string executedCommand;
+
     std::string cmd = m_recognizer.commandForGesture(m_input.points());
     if (cmd.empty()) {
       std::string sym = m_router.recognize(m_input.points());
       if (!sym.empty()) {
+        recognizedSymbol = sym;
         std::string macroCmd;
         if (triggerMacro(sym, macroCmd)) {
-          cmd = macroCmd;
+          executedCommand = macroCmd;
         } else {
-          cmd = m_router.commandForSymbol(sym);
-          if (!cmd.empty())
-            showHoverFeedback(QString::fromStdString(cmd));
-          else
+          std::string routed = m_router.commandForSymbol(sym);
+          if (!routed.empty()) {
+            executedCommand = routed;
+            showHoverFeedback(QString::fromStdString(routed));
+          } else {
             showHoverFeedback(QString::fromStdString(sym));
+          }
         }
       }
     } else {
+      executedCommand = cmd;
+      auto prediction = m_recognizer.predictWithDistance(m_input.points());
+      if (!prediction.first.empty())
+        recognizedSymbol = prediction.first;
       showHoverFeedback(QString::fromStdString(cmd));
     }
-    SC_LOG(sc::LogLevel::Info, std::string("Detected command: ") + cmd);
+
+    if (!recognizedSymbol.empty() || !executedCommand.empty()) {
+      std::string logMessage = "Detected symbol: " +
+                               (recognizedSymbol.empty() ? std::string("<none>")
+                                                         : recognizedSymbol);
+      logMessage += ", action: " +
+                    (executedCommand.empty() ? std::string("<none>")
+                                             : executedCommand);
+      SC_LOG(sc::LogLevel::Info, logMessage);
+    } else {
+      SC_LOG(sc::LogLevel::Info,
+             std::string("Detected symbol: <none>, action: <none>"));
+    }
     m_input.clear();
     m_detectionRect = QRectF();
     m_idleTimer->start();
