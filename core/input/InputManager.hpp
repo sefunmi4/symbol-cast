@@ -19,6 +19,7 @@ struct Point {
 // InputManager records gesture points for later recognition or training.
 enum class TapAction {
     None,
+    ResetDrawing,
     StartSequence,
     EndSymbol,
     EndSequence,
@@ -52,6 +53,8 @@ public:
         }
 
         m_lastTap = timestamp;
+        if (!m_capturing)
+            clear();
         return false;
     }
 
@@ -68,7 +71,9 @@ public:
                 return TapAction::StartSequence;
             }
             m_lastTap = timestamp;
-            return TapAction::None;
+            clear();
+            m_tapCount = 0;
+            return TapAction::ResetDrawing;
         }
 
         if (timestamp - m_lastTap > m_doubleTapInterval) {

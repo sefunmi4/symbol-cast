@@ -228,6 +228,13 @@ protected:
       m_strokes.clear();
       m_label->show();
       SC_LOG(sc::LogLevel::Info, "Sequence end");
+    } else if (act == sc::TapAction::ResetDrawing) {
+      m_input.clear();
+      m_strokes.clear();
+      m_predictionPath = QPainterPath();
+      m_detectionRect = QRectF();
+      m_label->show();
+      updatePrediction();
     } else if (act == sc::TapAction::LabelSymbol) {
       onTrainGesture();
     } else if (act == sc::TapAction::RecordStream) {
