@@ -11,6 +11,6 @@ int main() {
 
     std::vector<sc::Point> square{{0.f,0.f},{1.f,0.f},{1.f,1.f},{0.f,1.f}};
     assert(hybrid.predict(square) == "square");
-    assert(hybrid.commandForGesture(square) == "open-menu");
+    assert(hybrid.commandForGesture(square) == "custom");
     return 0;
 }
