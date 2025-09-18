@@ -22,5 +22,13 @@ int main() {
     assert(!dbl && mgr.capturing());
     dbl = mgr.onTap(240);
     assert(dbl && !mgr.capturing());
+
+    mgr.startCapture();
+    mgr.addPoint(0.f, 0.f);
+    mgr.addPoint(1.f, 1.f);
+    mgr.stopCapture();
+    assert(!mgr.points().empty());
+    dbl = mgr.onTap(400); // single tap resets drawing when idle
+    assert(!dbl && mgr.points().empty());
     return 0;
 }
