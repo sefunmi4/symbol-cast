@@ -5,7 +5,10 @@
 #include <unordered_map>
 #include <fstream>
 #include <cctype>
+#include <algorithm>
+#include <cmath>
 #include "../input/InputManager.hpp"
+#include "utils/Logger.hpp"
 #ifdef SC_USE_ONNXRUNTIME
 #  include <onnxruntime_cxx_api.h>
 #endif
@@ -23,6 +26,9 @@ public:
 
     bool loadModel(const std::string& path) {
         m_modelPath = path;
+        m_modelLoaded = false;
+        m_warnedFallback = false;
+        m_modelFilePresent = false;
 
         // Ensure the model file actually exists before proceeding. Without
         // ONNX Runtime enabled the function previously returned `true`
@@ -32,6 +38,7 @@ public:
         std::ifstream file(path, std::ios::binary);
         if (!file.good())
             return false;
+        m_modelFilePresent = true;
 
 #ifdef SC_USE_ONNXRUNTIME
         session.reset();
@@ -39,6 +46,7 @@ public:
         opts.SetIntraOpNumThreads(1);
         try {
             session.emplace(env, path.c_str(), opts);
+            m_modelLoaded = true;
         } catch (...) {
             return false;
         }
@@ -75,7 +83,22 @@ public:
             }
         }
 #endif
-        return points.size() > 3 ? "square" : (points.size() > 2 ? "triangle" : "circle");
+        if (!m_warnedFallback) {
+            if (!m_runtimeEnabled && m_modelFilePresent)
+                SC_LOG(sc::LogLevel::Warn,
+                       "ONNX Runtime support is not enabled. Falling back to heuristic detection for " +
+                           m_modelPath + ".");
+            else if (m_modelFilePresent && !m_modelLoaded)
+                SC_LOG(sc::LogLevel::Warn,
+                       "ONNX model " + m_modelPath +
+                           " could not be loaded by ONNX Runtime. Falling back to heuristic detection.");
+            else if (!m_modelPath.empty())
+                SC_LOG(sc::LogLevel::Warn,
+                       "Model " + m_modelPath +
+                           " not available. Falling back to heuristic detection.");
+            m_warnedFallback = true;
+        }
+        return classifyHeuristic(points);
     }
 
     std::string commandForSymbol(const std::string& symbol) const {
@@ -121,7 +144,110 @@ private:
         }
     }
 
+    std::string classifyHeuristic(const std::vector<Point>& points) const {
+        if (points.empty())
+            return std::string();
+
+        if (points.size() <= 2)
+            return "circle";
+
+        float minX = points.front().x;
+        float maxX = points.front().x;
+        float minY = points.front().y;
+        float maxY = points.front().y;
+        float sumX = 0.f;
+        float sumY = 0.f;
+        for (const auto& p : points) {
+            minX = std::min(minX, p.x);
+            maxX = std::max(maxX, p.x);
+            minY = std::min(minY, p.y);
+            maxY = std::max(maxY, p.y);
+            sumX += p.x;
+            sumY += p.y;
+        }
+
+        const float width = std::max(1e-3f, maxX - minX);
+        const float height = std::max(1e-3f, maxY - minY);
+        const float aspect = width > height ? width / height : height / width;
+        const float cx = sumX / static_cast<float>(points.size());
+        const float cy = sumY / static_cast<float>(points.size());
+
+        float meanRadius = 0.f;
+        std::vector<float> radii;
+        radii.reserve(points.size());
+        for (const auto& p : points) {
+            float dx = p.x - cx;
+            float dy = p.y - cy;
+            float dist = std::sqrt(dx * dx + dy * dy);
+            radii.push_back(dist);
+            meanRadius += dist;
+        }
+        meanRadius /= static_cast<float>(radii.size());
+
+        float variance = 0.f;
+        for (float r : radii) {
+            float diff = r - meanRadius;
+            variance += diff * diff;
+        }
+        variance /= static_cast<float>(std::max<size_t>(1, radii.size() - 1));
+        float radiusStdDev = std::sqrt(variance);
+        float radialUniformity = meanRadius > 1e-3f ? radiusStdDev / meanRadius : 1.f;
+
+        auto cross = [](const Point& o, const Point& a, const Point& b) {
+            return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+        };
+
+        std::vector<Point> sorted = points;
+        std::sort(sorted.begin(), sorted.end(), [](const Point& a, const Point& b) {
+            if (a.x == b.x)
+                return a.y < b.y;
+            return a.x < b.x;
+        });
+        sorted.erase(std::unique(sorted.begin(), sorted.end(), [](const Point& a, const Point& b) {
+                         return std::fabs(a.x - b.x) < 1e-3f && std::fabs(a.y - b.y) < 1e-3f;
+                     }),
+                     sorted.end());
+
+        size_t hullSize = sorted.size();
+        if (sorted.size() >= 3) {
+            std::vector<Point> hull(2 * sorted.size());
+            size_t k = 0;
+            for (const auto& pt : sorted) {
+                while (k >= 2 && cross(hull[k - 2], hull[k - 1], pt) <= 0.f)
+                    --k;
+                hull[k++] = pt;
+            }
+            for (int i = static_cast<int>(sorted.size()) - 2, t = static_cast<int>(k) + 1; i >= 0; --i) {
+                const auto& pt = sorted[static_cast<size_t>(i)];
+                while (k >= static_cast<size_t>(t) && cross(hull[k - 2], hull[k - 1], pt) <= 0.f)
+                    --k;
+                hull[k++] = pt;
+            }
+            hullSize = k > 1 ? k - 1 : k;
+        }
+
+        if (hullSize >= 4 && aspect < 1.3f)
+            return "square";
+        if (hullSize == 3)
+            return "triangle";
+        if (radialUniformity < 0.25f)
+            return "circle";
+        if (aspect < 1.2f && points.size() > 12)
+            return "square";
+        if (points.size() > 10)
+            return "triangle";
+        return "circle";
+    }
+
     std::string m_modelPath;
+    bool m_modelLoaded{false};
+    bool m_modelFilePresent{false};
+    mutable bool m_warnedFallback{false};
+#ifdef SC_USE_ONNXRUNTIME
+    bool m_runtimeEnabled{true};
+#else
+    bool m_runtimeEnabled{false};
+#endif
     std::unordered_map<std::string, std::string> m_commands;
 #ifdef SC_USE_ONNXRUNTIME
     Ort::Env env{ORT_LOGGING_LEVEL_WARNING, "symbolcast"};
