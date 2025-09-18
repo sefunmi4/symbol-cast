@@ -10,14 +10,15 @@ namespace sc {
 class RecognizerRouter {
 public:
     explicit RecognizerRouter(const std::string& configFile = "config/models.json") {
-        loadConfig(configFile);
+        if (!loadConfig(configFile))
+            loadFallbackModels();
     }
 
     bool loadConfig(const std::string& path) {
-        m_models.clear();
         std::ifstream in(path);
         if (!in.is_open())
             return false;
+        m_models.clear();
         std::string content((std::istreambuf_iterator<char>(in)),
                             std::istreambuf_iterator<char>());
         size_t pos = 0;
@@ -37,6 +38,8 @@ public:
             m_models[key].loadModel(val);
             pos = endVal + 1;
         }
+        if (m_models.empty())
+            loadFallbackModels();
         return !m_models.empty();
     }
 
@@ -64,6 +67,13 @@ public:
     }
 
 private:
+    void loadFallbackModels() {
+        if (!m_models.empty())
+            return;
+        m_models.emplace("shape_model", ModelRunner());
+        m_models.emplace("letter_model", ModelRunner());
+    }
+
     std::unordered_map<std::string, ModelRunner> m_models;
 };
 
