@@ -35,22 +35,18 @@ public:
           m_tapCount(0) {}
 
     // Handle a tap event with timestamp in milliseconds. Returns true if
-    // a double tap was detected. Two taps start capture, a single tap
-    // while capturing stops it.
+    // a double tap was detected. Two taps toggle capture: when idle a
+    // double tap starts capturing and another double tap stops it.
     bool onTap(uint64_t timestamp) {
         if (timestamp < m_lastTap)
             m_lastTap = std::numeric_limits<uint64_t>::max(); // reset if timestamps go backwards
 
-        if (m_capturing) {
-            // any tap while capturing ends the capture
-            stopCapture();
-            m_lastTap = std::numeric_limits<uint64_t>::max();
-            return false;
-        }
-
         if (m_lastTap != std::numeric_limits<uint64_t>::max() &&
             timestamp - m_lastTap < m_doubleTapInterval) {
-            startCapture();
+            if (m_capturing)
+                stopCapture();
+            else
+                startCapture();
             m_lastTap = std::numeric_limits<uint64_t>::max();
             return true;
         }
@@ -84,18 +80,22 @@ public:
 
         switch (m_tapCount) {
         case 1:
-            return TapAction::EndSymbol;
+            return TapAction::None;
         case 2:
             stopCapture();
             m_tapCount = 0;
             m_lastTap = std::numeric_limits<uint64_t>::max();
             return TapAction::EndSequence;
         case 3:
+            return TapAction::None;
+        case 4:
             stopCapture();
             m_tapCount = 0;
             m_lastTap = std::numeric_limits<uint64_t>::max();
             return TapAction::LabelSymbol;
-        case 4:
+        case 5:
+            return TapAction::None;
+        case 6:
             stopCapture();
             m_tapCount = 0;
             m_lastTap = std::numeric_limits<uint64_t>::max();

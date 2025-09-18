@@ -96,8 +96,7 @@ public:
     resize(w, h);
     // Instruction label shown when idle
     m_label = new QLabel(
-        tr("Double-tap to start. Single-tap ends symbol. Double-tap submits."),
-        this);
+        tr("Double-tap to start. Double-tap again to submit."), this);
     m_label->setStyleSheet("color:#CCCCCC;font-size:12px;");
     m_label->setAlignment(Qt::AlignCenter);
     m_label->setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -223,10 +222,6 @@ protected:
       m_label->hide();
       SC_LOG(sc::LogLevel::Info, "Sequence start");
       updatePrediction();
-    } else if (act == sc::TapAction::EndSymbol) {
-      onSubmit();
-      m_input.clear();
-      m_strokes.clear();
     } else if (act == sc::TapAction::EndSequence) {
       onSubmit();
       m_input.clear();
