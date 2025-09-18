@@ -925,7 +925,7 @@ private:
     return m_settingsButton && m_settingsButton->isVisible() &&
            m_settingsButton->geometry().contains(pos);
   }
-
+  
   sc::InputManager m_input;
   QLabel *m_label;
   QPushButton *m_closeBtn;
