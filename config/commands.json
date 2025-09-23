@@ -1,6 +1,26 @@
 {
-    "triangle": "copy",
-    "circle": "paste",
-    "square": "custom",
-    "dot": "paste"
+  "triangle": {
+    "command": "copy",
+    "display": "Copy",
+    "action": "copy",
+    "output": "\u0394"
+  },
+  "circle": {
+    "command": "paste",
+    "display": "Paste",
+    "action": "paste",
+    "output": "\u25CB"
+  },
+  "square": {
+    "command": "custom",
+    "display": "Custom",
+    "action": "",
+    "output": "\u25A1"
+  },
+  "dot": {
+    "command": "paste",
+    "display": "Paste",
+    "action": "paste",
+    "output": "."
+  }
 }

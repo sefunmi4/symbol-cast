@@ -123,6 +123,32 @@ private:
             return;
         std::string content((std::istreambuf_iterator<char>(in)),
                             std::istreambuf_iterator<char>());
+        auto extractJsonString = [](const std::string& object,
+                                    const std::string& key) -> std::string {
+            size_t keyPos = object.find(key);
+            if (keyPos == std::string::npos)
+                return {};
+            size_t colon = object.find(':', keyPos + key.size());
+            if (colon == std::string::npos)
+                return {};
+            size_t quote = object.find('"', colon);
+            if (quote == std::string::npos)
+                return {};
+            std::string value;
+            bool escape = false;
+            for (size_t i = quote + 1; i < object.size(); ++i) {
+                char c = object[i];
+                if (!escape && c == '\\') {
+                    escape = true;
+                    continue;
+                }
+                if (!escape && c == '"')
+                    break;
+                value.push_back(c);
+                escape = false;
+            }
+            return value;
+        };
         size_t pos = 0;
         while ((pos = content.find('"', pos)) != std::string::npos) {
             size_t endKey = content.find('"', pos + 1);
@@ -132,15 +158,39 @@ private:
             if (pos == std::string::npos) break;
             ++pos;
             while (pos < content.size() && std::isspace(static_cast<unsigned char>(content[pos]))) ++pos;
-            if (pos >= content.size() || content[pos] != '"') continue;
-            size_t endVal = content.find('"', pos + 1);
-            if (endVal == std::string::npos) break;
-            std::string val = content.substr(pos + 1, endVal - pos - 1);
-            std::string normalized = (key == "dot") ? "circle" : key;
-            m_commands[normalized] = val;
-            if (normalized == "circle")
-                m_commands["dot"] = val;
-            pos = endVal + 1;
+            if (pos >= content.size())
+                break;
+            if (content[pos] == '"') {
+                size_t endVal = content.find('"', pos + 1);
+                if (endVal == std::string::npos) break;
+                std::string val = content.substr(pos + 1, endVal - pos - 1);
+                std::string normalized = (key == "dot") ? "circle" : key;
+                m_commands[normalized] = val;
+                if (normalized == "circle")
+                    m_commands["dot"] = val;
+                pos = endVal + 1;
+            } else if (content[pos] == '{') {
+                size_t startObj = pos;
+                int depth = 0;
+                do {
+                    if (content[pos] == '{')
+                        ++depth;
+                    else if (content[pos] == '}')
+                        --depth;
+                    ++pos;
+                } while (pos < content.size() && depth > 0);
+                if (depth != 0)
+                    break;
+                size_t endObj = pos;
+                std::string object = content.substr(startObj, endObj - startObj);
+                std::string command = extractJsonString(object, "\"command\"");
+                if (!command.empty()) {
+                    std::string normalized = (key == "dot") ? "circle" : key;
+                    m_commands[normalized] = command;
+                    if (normalized == "circle")
+                        m_commands["dot"] = command;
+                }
+            }
         }
     }
 
