@@ -4,12 +4,21 @@
 #include "core/recognition/ModelRunner.hpp"
 #include "core/recognition/RecognizerRouter.hpp"
 #include "core/recognition/GestureRecognizer.hpp"
+#include "core/recognition/TrocrDecoder.hpp"
 #include "utils/Logger.hpp"
 #include <QCoreApplication>
+#include <QClipboard>
+#include <QDir>
 #include <QDateTime>
+#include <QFile>
+#include <QGuiApplication>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeySequence>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPen>
 #include <QPainterPath>
 #include <QPushButton>
 #include <QLabel>
@@ -31,12 +40,15 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QString>
+#include <QTransform>
 #include <QWidget>
 #include <algorithm>
 #include <vector>
 #include <random>
 #include <deque>
 #include <unordered_map>
+#include <memory>
+#include <cstdint>
 
 struct CanvasWindowOptions {
   float rippleGrowthRate{2.f};
@@ -158,6 +170,11 @@ public:
     connect(m_hoverTimer, &QTimer::timeout, m_hoverLabel, &QWidget::hide);
 
     setupMacroControls();
+    loadPaletteConfig();
+#ifdef SC_ENABLE_TROCR
+    initializeTrocrDecoder();
+#endif
+    loadMacroBindingsFromConfig();
     setupSettingsMenu();
     updateMacroPanelGeometry();
     updateSettingsButtonGeometry();
@@ -452,6 +469,29 @@ private slots:
       return;
     std::string recognizedSymbol;
     std::string executedCommand;
+    QString emittedGlyph;
+    QString trocrGlyph;
+
+#ifdef SC_ENABLE_TROCR
+    if (m_trocrDecoder && m_trocrDecoder->available()) {
+      QImage glyphImage = renderGlyphForTrocr();
+      if (!glyphImage.isNull()) {
+        std::u32string decoded = m_trocrDecoder->decode(glyphImage);
+        for (char32_t cp : decoded) {
+          if (cp == U'\0')
+            continue;
+          QChar qc = QChar::fromUcs4(cp);
+          if (!qc.isNull() && qc.isSpace() && decoded.size() > 1)
+            continue;
+          trocrGlyph = mapCodepointToPalette(cp);
+          if (!trocrGlyph.isEmpty())
+            break;
+        }
+        if (trocrGlyph.isEmpty() && !decoded.empty())
+          trocrGlyph = mapCodepointToPalette(decoded.front());
+      }
+    }
+#endif
 
     std::string cmd = m_recognizer.commandForGesture(m_input.points());
     if (cmd.empty()) {
@@ -459,7 +499,7 @@ private slots:
       if (!sym.empty()) {
         recognizedSymbol = sym;
         std::string macroCmd;
-        if (triggerMacro(sym, macroCmd)) {
+        if (triggerMacro(sym, trocrGlyph, macroCmd, emittedGlyph)) {
           executedCommand = macroCmd;
         } else {
           std::string routed = m_router.commandForSymbol(sym);
@@ -467,7 +507,10 @@ private slots:
             executedCommand = routed;
             showHoverFeedback(QString::fromStdString(routed));
           } else {
-            showHoverFeedback(QString::fromStdString(sym));
+            if (!trocrGlyph.isEmpty())
+              showHoverFeedback(trocrGlyph);
+            else
+              showHoverFeedback(QString::fromStdString(sym));
           }
         }
       }
@@ -476,8 +519,14 @@ private slots:
       auto prediction = m_recognizer.predictWithDistance(m_input.points());
       if (!prediction.first.empty())
         recognizedSymbol = prediction.first;
-      showHoverFeedback(QString::fromStdString(cmd));
+      if (!trocrGlyph.isEmpty())
+        showHoverFeedback(trocrGlyph);
+      else
+        showHoverFeedback(QString::fromStdString(cmd));
     }
+
+    if (emittedGlyph.isEmpty() && !trocrGlyph.isEmpty())
+      emittedGlyph = trocrGlyph;
 
     if (!recognizedSymbol.empty() || !executedCommand.empty()) {
       std::string logMessage = "Detected symbol: " +
@@ -486,6 +535,8 @@ private slots:
       logMessage += ", action: " +
                     (executedCommand.empty() ? std::string("<none>")
                                              : executedCommand);
+      if (!emittedGlyph.isEmpty())
+        logMessage += ", glyph: " + emittedGlyph.toStdString();
       SC_LOG(sc::LogLevel::Info, logMessage);
     } else {
       SC_LOG(sc::LogLevel::Info,
@@ -574,12 +625,12 @@ private:
     QString id;
     QString commandDisplay;
     QString commandAction;
-    QChar character{QChar()};
+    QString output;
   };
 
   struct MacroUIRow {
     QComboBox *combo{nullptr};
-    QLabel *charLabel{nullptr};
+    QLabel *glyphLabel{nullptr};
   };
 
   void resetIdleTimer() {
@@ -616,12 +667,12 @@ private:
     auto bindingIt = m_macroBindings.find(sym);
     if (bindingIt != m_macroBindings.end() &&
         (!bindingIt->second.commandDisplay.isEmpty() ||
-         !bindingIt->second.character.isNull())) {
+         !bindingIt->second.output.isEmpty())) {
       QString label = bindingIt->second.commandDisplay.isEmpty()
                            ? QString::fromStdString(sym)
                            : bindingIt->second.commandDisplay;
-      if (!bindingIt->second.character.isNull())
-        label += QStringLiteral(" (%1)").arg(bindingIt->second.character);
+      if (!bindingIt->second.output.isEmpty())
+        label += QStringLiteral(" (%1)").arg(bindingIt->second.output);
       showHoverFeedback(label);
     } else {
       showHoverFeedback(QString::fromStdString(sym));
@@ -686,19 +737,6 @@ private:
     addMacroRow("triangle", tr("Triangle"), layout);
     addMacroRow("circle", tr("Circle"), layout);
     addMacroRow("square", tr("Square"), layout);
-
-    setComboToId("triangle", QStringLiteral("copy"), true);
-    setMacroBinding("triangle", presetBinding(QStringLiteral("copy")));
-
-    setComboToId("circle", QStringLiteral("paste"), true);
-    setMacroBinding("circle", presetBinding(QStringLiteral("paste")));
-
-    setComboToId("square", QStringLiteral("custom"), true);
-    MacroBinding customBinding;
-    customBinding.id = QStringLiteral("custom");
-    customBinding.commandDisplay = tr("Custom");
-    customBinding.character = QChar('?');
-    setMacroBinding("square", customBinding);
 
     for (auto &entry : m_macroRows) {
       if (!entry.second.combo)
@@ -784,14 +822,14 @@ private:
     combo->setCursor(Qt::ArrowCursor);
     rowLayout->addWidget(combo, 1);
 
-    QLabel *charLabel = new QLabel(tr("--"), row);
-    charLabel->setStyleSheet("color:#FFFFFF;font-size:10px;");
-    charLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    charLabel->setFixedWidth(28);
-    rowLayout->addWidget(charLabel);
+    QLabel *glyphLabel = new QLabel(tr("--"), row);
+    glyphLabel->setStyleSheet("color:#FFFFFF;font-size:10px;");
+    glyphLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    glyphLabel->setFixedWidth(48);
+    rowLayout->addWidget(glyphLabel);
 
     layout->addWidget(row);
-    m_macroRows[symbol] = {combo, charLabel};
+    m_macroRows[symbol] = {combo, glyphLabel};
   }
 
   void updateMacroPanelGeometry() {
@@ -822,15 +860,17 @@ private:
     }
   }
 
-  void setMacroBinding(const std::string &symbol, const MacroBinding &binding) {
+  void setMacroBinding(const std::string &symbol, const MacroBinding &binding,
+                       bool persist = true) {
     m_macroBindings[symbol] = binding;
     auto it = m_macroRows.find(symbol);
-    if (it != m_macroRows.end() && it->second.charLabel) {
-      QString text = binding.character.isNull()
-                         ? QStringLiteral("--")
-                         : QString(binding.character);
-      it->second.charLabel->setText(text);
+    if (it != m_macroRows.end() && it->second.glyphLabel) {
+      QString text = binding.output.isEmpty() ? QStringLiteral("--")
+                                              : binding.output;
+      it->second.glyphLabel->setText(text);
     }
+    if (persist)
+      saveMacroBindings();
   }
 
   MacroBinding currentMacroBinding(const std::string &symbol) const {
@@ -846,15 +886,259 @@ private:
       binding.id = id;
       binding.commandDisplay = tr("Copy");
       binding.commandAction = QStringLiteral("copy");
-      binding.character = QChar('C');
     } else if (id == QStringLiteral("paste")) {
       binding.id = id;
       binding.commandDisplay = tr("Paste");
       binding.commandAction = QStringLiteral("paste");
-      binding.character = QChar('V');
     }
     return binding;
   }
+
+  MacroBinding defaultBindingForSymbol(const std::string &symbol) const {
+    if (symbol == "triangle")
+      return presetBinding(QStringLiteral("copy"));
+    if (symbol == "circle" || symbol == "dot")
+      return presetBinding(QStringLiteral("paste"));
+    if (symbol == "square") {
+      MacroBinding binding;
+      binding.id = QStringLiteral("custom");
+      binding.commandDisplay = tr("Custom");
+      binding.output = QStringLiteral("?");
+      return binding;
+    }
+    return MacroBinding();
+  }
+
+  QJsonObject readJsonObject(const QString &path) const {
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly))
+      return {};
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (!doc.isObject())
+      return {};
+    return doc.object();
+  }
+
+  MacroBinding bindingFromJson(const QJsonObject &obj) const {
+    MacroBinding binding;
+    binding.id = obj.value(QStringLiteral("command")).toString();
+    QString explicitId = obj.value(QStringLiteral("id")).toString();
+    if (!explicitId.isEmpty())
+      binding.id = explicitId;
+    binding.commandDisplay = obj.value(QStringLiteral("display")).toString();
+    binding.commandAction =
+        obj.value(QStringLiteral("action")).toString(binding.id);
+    binding.output = obj.value(QStringLiteral("output")).toString();
+    if (binding.id == QStringLiteral("custom") &&
+        binding.commandDisplay.isEmpty() && !binding.commandAction.isEmpty())
+      binding.commandDisplay = binding.commandAction;
+    return binding;
+  }
+
+  void loadMacroBindingsFromConfig() {
+    QJsonObject defaults = readJsonObject(QStringLiteral("config/commands.json"));
+    QJsonObject overrides = readJsonObject(QStringLiteral("data/macro_bindings.json"));
+    QJsonObject merged = defaults;
+    for (auto it = overrides.begin(); it != overrides.end(); ++it)
+      merged.insert(it.key(), it.value());
+
+    for (auto &entry : m_macroRows) {
+      QString symbolKey = QString::fromStdString(entry.first);
+      MacroBinding binding;
+      QJsonValue value = merged.value(symbolKey);
+      if (value.isObject()) {
+        binding = bindingFromJson(value.toObject());
+      } else if (value.isString()) {
+        QString command = value.toString();
+        binding = presetBinding(command);
+        if (binding.id.isEmpty()) {
+          binding.id = QStringLiteral("custom");
+          binding.commandDisplay = command;
+          binding.commandAction = command;
+        }
+      }
+      if (binding.id.isEmpty())
+        binding = defaultBindingForSymbol(entry.first);
+      if (binding.id.isEmpty())
+        binding.id = QStringLiteral("custom");
+      setMacroBinding(entry.first, binding, false);
+      setComboToId(entry.first, binding.id, true);
+    }
+  }
+
+  void saveMacroBindings() const {
+    if (m_macroBindings.empty())
+      return;
+    QJsonObject root;
+    for (const auto &entry : m_macroBindings) {
+      const MacroBinding &binding = entry.second;
+      QJsonObject obj;
+      if (!binding.id.isEmpty())
+        obj.insert(QStringLiteral("command"), binding.id);
+      if (!binding.commandDisplay.isEmpty())
+        obj.insert(QStringLiteral("display"), binding.commandDisplay);
+      if (!binding.commandAction.isEmpty())
+        obj.insert(QStringLiteral("action"), binding.commandAction);
+      if (!binding.output.isEmpty())
+        obj.insert(QStringLiteral("output"), binding.output);
+      root.insert(QString::fromStdString(entry.first), obj);
+    }
+    if (root.isEmpty())
+      return;
+    QDir().mkpath(QStringLiteral("data"));
+    QFile file(QStringLiteral("data/macro_bindings.json"));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+      return;
+    QJsonDocument doc(root);
+    file.write(doc.toJson(QJsonDocument::Indented));
+  }
+
+  void loadPaletteConfig() {
+    m_paletteEntries.assign(256, QString());
+    m_paletteDirect.clear();
+    m_paletteOverrides.clear();
+    for (int i = 0; i < 256; ++i) {
+      char32_t cp = static_cast<char32_t>(i);
+      QString ch = QString::fromUcs4(&cp, 1);
+      m_paletteEntries[static_cast<size_t>(i)] = ch;
+      m_paletteDirect[static_cast<uint32_t>(cp)] = ch;
+    }
+
+    QFile file(QStringLiteral("config/palette.json"));
+    if (!file.open(QIODevice::ReadOnly))
+      return;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (doc.isNull())
+      return;
+    if (doc.isArray()) {
+      applyPaletteArray(doc.array());
+      return;
+    }
+    if (doc.isObject()) {
+      QJsonObject obj = doc.object();
+      if (obj.value(QStringLiteral("palette")).isArray())
+        applyPaletteArray(obj.value(QStringLiteral("palette")).toArray());
+      if (obj.value(QStringLiteral("map")).isObject())
+        applyPaletteOverrides(obj.value(QStringLiteral("map")).toObject());
+    }
+  }
+
+  void applyPaletteArray(const QJsonArray &arr) {
+    const int limit = std::min(256, arr.size());
+    for (int i = 0; i < limit; ++i) {
+      QString entry = arr.at(i).toString();
+      if (entry.isEmpty()) {
+        char32_t cp = static_cast<char32_t>(i);
+        entry = QString::fromUcs4(&cp, 1);
+      }
+      m_paletteEntries[static_cast<size_t>(i)] = entry;
+      auto codepoints = entry.toUcs4();
+      if (!codepoints.empty())
+        m_paletteDirect[static_cast<uint32_t>(codepoints.front())] = entry;
+    }
+  }
+
+  void applyPaletteOverrides(const QJsonObject &obj) {
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+      QString key = it.key();
+      bool ok = false;
+      uint32_t cp = 0;
+      if (key.startsWith(QStringLiteral("0x")))
+        cp = key.mid(2).toUInt(&ok, 16);
+      else
+        cp = key.toUInt(&ok, 10);
+      if (!ok)
+        continue;
+      QString value = it.value().toString();
+      if (!value.isEmpty())
+        m_paletteOverrides[cp] = value;
+    }
+  }
+
+  QString mapCodepointToPalette(char32_t codepoint) const {
+    auto overrideIt = m_paletteOverrides.find(static_cast<uint32_t>(codepoint));
+    if (overrideIt != m_paletteOverrides.end())
+      return overrideIt->second;
+    auto directIt = m_paletteDirect.find(static_cast<uint32_t>(codepoint));
+    if (directIt != m_paletteDirect.end())
+      return directIt->second;
+    if (!m_paletteEntries.empty()) {
+      size_t idx = static_cast<size_t>(codepoint) % m_paletteEntries.size();
+      return m_paletteEntries[idx];
+    }
+    return QString::fromUcs4(&codepoint, 1);
+  }
+
+#ifdef SC_ENABLE_TROCR
+  void initializeTrocrDecoder() {
+    m_trocrInputSize = 384;
+    QJsonObject cfg = readJsonObject(QStringLiteral("config/trocr.json"));
+    QString modulePath = cfg.value(QStringLiteral("module")).toString();
+    QString tokenizerPath = cfg.value(QStringLiteral("tokenizer")).toString();
+    int configuredSize = cfg.value(QStringLiteral("input_size")).toInt();
+    if (configuredSize > 0)
+      m_trocrInputSize = configuredSize;
+    if (!modulePath.isEmpty() && !tokenizerPath.isEmpty()) {
+      m_trocrDecoder = std::make_unique<sc::TrocrDecoder>(
+          modulePath.toStdString(), tokenizerPath.toStdString(), m_trocrInputSize);
+    } else {
+      m_trocrDecoder.reset();
+    }
+  }
+
+  QImage renderGlyphForTrocr() const {
+    if (!m_trocrDecoder || m_strokes.empty())
+      return QImage();
+    const int size = std::max(32, m_trocrInputSize);
+    QImage image(size, size, QImage::Format_RGBA8888);
+    image.fill(Qt::white);
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QRectF bounds;
+    bool hasBounds = false;
+    for (const auto &stroke : m_strokes) {
+      if (stroke.path.isEmpty())
+        continue;
+      if (!hasBounds) {
+        bounds = stroke.path.boundingRect();
+        hasBounds = true;
+      } else {
+        bounds = bounds.united(stroke.path.boundingRect());
+      }
+    }
+    if (!hasBounds || bounds.width() <= 0.0 || bounds.height() <= 0.0)
+      return image;
+
+    const qreal marginRatio = 0.15;
+    QRectF targetRect(marginRatio * size, marginRatio * size,
+                      size * (1 - 2 * marginRatio),
+                      size * (1 - 2 * marginRatio));
+    QTransform transform;
+    qreal scale = std::min(targetRect.width() / bounds.width(),
+                           targetRect.height() / bounds.height());
+    transform.translate(targetRect.center().x(), targetRect.center().y());
+    transform.scale(scale, scale);
+    transform.translate(-bounds.center().x(), -bounds.center().y());
+    painter.setTransform(transform);
+
+    QPen pen(Qt::black, std::max(1.5, m_options.strokeWidth * 0.8));
+    pen.setCapStyle(Qt::RoundCap);
+    pen.setJoinStyle(Qt::RoundJoin);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+
+    for (const auto &stroke : m_strokes) {
+      if (!stroke.path.isEmpty())
+        painter.drawPath(stroke.path);
+    }
+    painter.end();
+    return image;
+  }
+#else
+  void initializeTrocrDecoder() {}
+  QImage renderGlyphForTrocr() const { return QImage(); }
+#endif
 
   void restorePreviousSelection(const std::string &symbol, const QString &id) {
     if (id.isEmpty())
@@ -884,13 +1168,11 @@ private:
       }
       commandInput = commandInput.trimmed();
 
-      QString charDefault = (!previous.character.isNull())
-                                ? QString(previous.character)
-                                : QString();
-      QString charInput = QInputDialog::getText(
+      QString glyphDefault = previous.output;
+      QString glyphInput = QInputDialog::getText(
           this, tr("Character Mapping"),
           tr("Character to emit (optional):"), QLineEdit::Normal,
-          charDefault, &ok);
+          glyphDefault, &ok);
       if (!ok) {
         restorePreviousSelection(symbol, previous.id);
         return;
@@ -902,10 +1184,7 @@ private:
       binding.commandDisplay = commandInput.isEmpty()
                                    ? tr("Custom")
                                    : commandInput;
-      if (!charInput.isEmpty())
-        binding.character = charInput.front();
-      else if (!charDefault.isEmpty())
-        binding.character = charDefault.front();
+      binding.output = glyphInput.isEmpty() ? glyphDefault : glyphInput;
       setMacroBinding(symbol, binding);
 
       if (!binding.commandAction.isEmpty())
@@ -919,6 +1198,7 @@ private:
         restorePreviousSelection(symbol, previous.id);
         return;
       }
+      binding.output = previous.output;
       setMacroBinding(symbol, binding);
       int customIndex = combo->findData(QStringLiteral("custom"));
       if (customIndex >= 0)
@@ -926,50 +1206,73 @@ private:
     }
   }
 
-  bool triggerMacro(const std::string &symbol, std::string &executedCommand) {
+  bool triggerMacro(const std::string &symbol, const QString &glyphOverride,
+                    std::string &executedCommand, QString &emittedGlyph) {
     auto it = m_macroBindings.find(symbol);
     if (it == m_macroBindings.end())
       return false;
     const MacroBinding &binding = it->second;
     if (binding.id.isEmpty() && binding.commandDisplay.isEmpty() &&
-        binding.commandAction.isEmpty())
+        binding.commandAction.isEmpty() && binding.output.isEmpty())
       return false;
 
-    QString charText = binding.character.isNull()
-                           ? QString()
-                           : QString(binding.character);
+    QString outputText = glyphOverride.isEmpty() ? binding.output : glyphOverride;
     QString message;
 
+    if (!outputText.isEmpty()) {
+      emittedGlyph = outputText;
+      if (QClipboard *clipboard = QGuiApplication::clipboard())
+        clipboard->setText(outputText);
+      m_macroBuffer = outputText;
+    }
+
     if (binding.id == QStringLiteral("copy")) {
-      QString buffer = charText;
-      if (buffer.isEmpty())
-        buffer = binding.commandAction;
-      if (buffer.isEmpty())
-        buffer = QString::fromStdString(symbol);
-      m_macroBuffer = buffer;
-      message = tr("Copied %1").arg(buffer);
+      if (outputText.isEmpty()) {
+        QString fallback = binding.commandAction.isEmpty()
+                                 ? QString::fromStdString(symbol)
+                                 : binding.commandAction;
+        if (!fallback.isEmpty()) {
+          if (QClipboard *clipboard = QGuiApplication::clipboard())
+            clipboard->setText(fallback);
+          emittedGlyph = fallback;
+          m_macroBuffer = fallback;
+          outputText = fallback;
+        }
+      }
+      message = outputText.isEmpty() ? tr("Copy") : tr("Copied %1").arg(outputText);
     } else if (binding.id == QStringLiteral("paste")) {
-      if (m_macroBuffer.isEmpty())
-        message = tr("Paste buffer empty");
-      else
-        message = tr("Pasted %1").arg(m_macroBuffer);
+      if (outputText.isEmpty()) {
+        if (m_macroBuffer.isEmpty()) {
+          message = tr("Paste buffer empty");
+        } else {
+          if (QClipboard *clipboard = QGuiApplication::clipboard())
+            clipboard->setText(m_macroBuffer);
+          emittedGlyph = m_macroBuffer;
+          outputText = m_macroBuffer;
+          message = tr("Pasted %1").arg(m_macroBuffer);
+        }
+      } else {
+        if (QClipboard *clipboard = QGuiApplication::clipboard())
+          clipboard->setText(outputText);
+        emittedGlyph = outputText;
+        message = tr("Pasted %1").arg(outputText);
+      }
     } else {
-      if (!binding.commandAction.isEmpty())
-        m_macroBuffer = binding.commandAction;
       QString displayName = binding.commandDisplay.isEmpty()
                                 ? tr("Custom")
                                 : binding.commandDisplay;
       message =
           tr("%1 → %2").arg(QString::fromStdString(symbol), displayName);
-      if (!charText.isEmpty())
-        message += QStringLiteral(" (%1)").arg(charText);
+      if (!outputText.isEmpty())
+        message += QStringLiteral(" (%1)").arg(outputText);
     }
 
     executedCommand = binding.commandAction.isEmpty()
                           ? binding.id.toStdString()
                           : binding.commandAction.toStdString();
 
-    showHoverFeedback(message);
+    if (!message.isEmpty())
+      showHoverFeedback(message);
     return true;
   }
 
@@ -1050,6 +1353,13 @@ private:
   QAction *m_macroPanelAction{nullptr};
   std::unordered_map<std::string, MacroUIRow> m_macroRows;
   std::unordered_map<std::string, MacroBinding> m_macroBindings;
+#ifdef SC_ENABLE_TROCR
+  std::unique_ptr<sc::TrocrDecoder> m_trocrDecoder;
+#endif
+  int m_trocrInputSize{384};
+  std::vector<QString> m_paletteEntries;
+  std::unordered_map<uint32_t, QString> m_paletteDirect;
+  std::unordered_map<uint32_t, QString> m_paletteOverrides;
   QString m_macroBuffer;
   QLabel *m_hoverLabel;
   QTimer *m_hoverTimer;

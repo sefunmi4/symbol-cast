@@ -20,6 +20,23 @@ if(SC_USE_ONNXRUNTIME)
   target_compile_definitions(symbolcast_core INTERFACE SC_USE_ONNXRUNTIME)
 endif()
 
+option(SC_ENABLE_TROCR "Enable TrOCR decoding with LibTorch" OFF)
+if(SC_ENABLE_TROCR)
+  find_package(Torch REQUIRED)
+  find_path(TOKENIZERS_INCLUDE_DIR tokenizers_cpp/tokenizers.h
+            HINTS $ENV{TOKENIZERS_ROOT}
+            PATH_SUFFIXES include include/tokenizers_cpp)
+  find_library(TOKENIZERS_LIBRARY NAMES tokenizers_cpp tokenizers
+               HINTS $ENV{TOKENIZERS_ROOT}
+               PATH_SUFFIXES lib lib64)
+  if(NOT TOKENIZERS_INCLUDE_DIR OR NOT TOKENIZERS_LIBRARY)
+    message(FATAL_ERROR "tokenizers C++ library not found. Set TOKENIZERS_ROOT to its prefix.")
+  endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+  target_include_directories(symbolcast_core INTERFACE ${TORCH_INCLUDE_DIRS} ${TOKENIZERS_INCLUDE_DIR})
+  target_compile_definitions(symbolcast_core INTERFACE SC_ENABLE_TROCR)
+endif()
+
 # Desktop application
 # MSVC and some other toolchains don't always link Qt dependencies
 # transitively, leading to "unresolved external symbol" (LNK2001) errors.
@@ -38,6 +55,15 @@ if(QT_FOUND)
       Qt${QT_VERSION_MAJOR}::Core
       Qt${QT_VERSION_MAJOR}::Gui
       Qt${QT_VERSION_MAJOR}::Widgets)
+  if(SC_ENABLE_TROCR)
+    target_link_libraries(symbolcast-desktop PRIVATE ${TORCH_LIBRARIES} ${TOKENIZERS_LIBRARY})
+    add_executable(symbolcast-trocr-infer
+        apps/trocr_infer.cpp)
+    target_link_libraries(symbolcast-trocr-infer PRIVATE
+        symbolcast_core
+        Qt${QT_VERSION_MAJOR}::Core)
+    target_link_libraries(symbolcast-trocr-infer PRIVATE ${TORCH_LIBRARIES} ${TOKENIZERS_LIBRARY})
+  endif()
 endif()
 
 # VR application

@@ -1,0 +1,5 @@
+{
+  "module": "models/trocr_traced.pt",
+  "tokenizer": "models/trocr_processor/tokenizer.json",
+  "input_size": 384
+}

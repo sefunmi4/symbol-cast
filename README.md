@@ -72,12 +72,23 @@ When a system tray is available, the desktop app adds a tray icon labeled **Symb
 
 ### Configuration
 
-SymbolCast loads command mappings from `config/commands.json` when it starts.
-Edit this file to change which command is triggered for each recognized symbol.
-Models are listed in `config/models.json` and loaded on demand by the router.
-After you export a network, update the JSON entries so each symbol points at the
-exact ONNX or TorchScript file you produced (for example,
-`models/symbolcast-v1.onnx` or `models/symbolcast-v1.ts`).
+SymbolCast loads macro bindings from `config/commands.json` when it starts. Each
+entry can specify a `command` (the preset identifier), optional `display` and
+`action` labels, and an `output` character that is shown in the UI. Runtime
+changes are written to `data/macro_bindings.json`, allowing you to keep project
+defaults under version control while preserving per-user overrides.
+
+The TrOCR decoder is configured via `config/trocr.json`, which records the
+TorchScript module path, tokenizer, and expected input size. You can further
+control the emitted characters by creating `config/palette.json`; provide a
+256-element `palette` array to redefine the base alphabet and optionally a
+`map` object that remaps arbitrary Unicode code points to palette entries. When
+the file is absent the decoder falls back to an ASCII palette.
+
+Models for the gesture router are listed in `config/models.json` and loaded on
+demand. After you export a network, update the JSON entries so each symbol
+points at the correct ONNX or TorchScript file (for example,
+`models/symbolcast-v1.onnx`).
 
 
 #### Command-line options
@@ -141,6 +152,19 @@ environment variable `ONNXRUNTIME_ROOT` to its location. Then pass
 cmake -DSC_USE_ONNXRUNTIME=ON ..
 ```
 
+To enable TorchScript-based TrOCR decoding, install LibTorch and the Hugging
+Face tokenizers library. Point `CMAKE_PREFIX_PATH` at your LibTorch download and
+set `TOKENIZERS_ROOT` to the tokenizers prefix, then configure with
+`-DSC_ENABLE_TROCR=ON`:
+
+```bash
+cmake -DCMAKE_PREFIX_PATH=/path/to/libtorch \
+      -DTOKENIZERS_ROOT=/path/to/tokenizers \
+      -DSC_ENABLE_TROCR=ON ..
+```
+Populate `config/trocr.json` with the exported module and tokenizer paths once
+the build is configured.
+
 
 
 ---
@@ -177,29 +201,22 @@ version control).
 
 ### TrOCR Export and C++ Inference
 
-Use `scripts/export_trocr.py` to convert the [TrOCR](https://huggingface.co/microsoft/trocr-base-stage1)
-model to TorchScript along with its processor files. The traced model and tokenizer can then be
-consumed from C++.
+Use `scripts/export_trocr.py` to convert the
+[TrOCR](https://huggingface.co/microsoft/trocr-base-stage1) model to TorchScript along with its
+processor files. Install the script's Python dependencies first with
+`pip install -r scripts/requirements.txt`. After the export completes, update `config/trocr.json` so
+the desktop app knows where to find the compiled module and tokenizer. When `SC_ENABLE_TROCR` is enabled the
+`core/recognition/TrocrDecoder` helper keeps both artifacts resident, renders submitted strokes to a
+normalized `QImage`, and decodes them into the configured 256-character palette.
 
-Install the script's Python dependencies before running the export script:
-
-```bash
-pip install -r scripts/requirements.txt
-# or
-pip install transformers pillow
-```
-
-The example `apps/trocr_infer.cpp` shows how to load the TorchScript module with LibTorch,
-preprocess an image using OpenCV, and decode the output tokens using the Hugging Face tokenizers
-library:
+For quick smoke tests you can run the small CLI driver that shares the same helper:
 
 ```bash
-g++ trocr_infer.cpp -o trocr_infer \
-    -I/path/to/libtorch/include -I/path/to/libtorch/include/torch/csrc/api/include \
-    -L/path/to/libtorch/lib -ltorch_cpu -lc10 \
-    `pkg-config --cflags --libs opencv4` \
-    -ltokenizers
+./symbolcast-trocr-infer models/trocr_traced.pt models/trocr_processor/tokenizer.json handwriting.png
 ```
+
+The command prints the recognized text to stdout. The desktop application uses the same pipeline to
+surface decoded glyphs through the macro system.
 
 
 ---
@@ -211,6 +228,7 @@ g++ trocr_infer.cpp -o trocr_infer \
   - install the OpenXR runtime for your headset and make sure the loader
     libraries are discoverable by CMake
 - ONNX Runtime (for model inference)
+- LibTorch + Hugging Face tokenizers (optional, for TrOCR decoding)
 - Python (for training scripts)
 
 ---
