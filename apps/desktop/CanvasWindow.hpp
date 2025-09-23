@@ -14,7 +14,10 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QColor>
+#include <QCloseEvent>
+#include <QHideEvent>
 #include <QResizeEvent>
+#include <QShowEvent>
 #include <QSize>
 #include <QShortcut>
 #include <QTimer>
@@ -53,8 +56,9 @@ class CanvasWindow : public QWidget {
 public:
 
   explicit CanvasWindow(const CanvasWindowOptions &opts = CanvasWindowOptions(), QWidget *parent = nullptr)
-      : QWidget(parent), m_options(opts), m_dragging(false), m_resizing(false),
-        m_pressPending(false), m_resizeEdges(0), m_borderWidth(2) {
+      : QWidget(parent), m_options(opts), m_hideOnClose(false),
+        m_dragging(false), m_resizing(false), m_pressPending(false),
+        m_resizeEdges(0), m_borderWidth(2) {
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
                    Qt::WindowStaysOnTopHint);
@@ -159,6 +163,8 @@ public:
     updateSettingsButtonGeometry();
   }
 
+  void setHideOnClose(bool hide) { m_hideOnClose = hide; }
+
   struct Ripple {
     QPointF pos;
     float radius{0.f};
@@ -178,7 +184,29 @@ public:
     EdgeBottom = 0x8
   };
 
+signals:
+  void visibilityChanged(bool visible);
+
 protected:
+  void closeEvent(QCloseEvent *event) override {
+    if (m_hideOnClose) {
+      event->ignore();
+      hide();
+    } else {
+      QWidget::closeEvent(event);
+    }
+  }
+
+  void hideEvent(QHideEvent *event) override {
+    QWidget::hideEvent(event);
+    emit visibilityChanged(false);
+  }
+
+  void showEvent(QShowEvent *event) override {
+    QWidget::showEvent(event);
+    emit visibilityChanged(true);
+  }
+
   void mousePressEvent(QMouseEvent *event) override {
     if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
       resetIdleTimer();
@@ -1029,6 +1057,7 @@ private:
   QPainterPath m_predictionPath;
   float m_predictionOpacity{0.f};
   QRectF m_detectionRect;
+  bool m_hideOnClose;
   bool m_dragging;
   bool m_resizing;
   bool m_pressPending;

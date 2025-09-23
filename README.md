@@ -68,6 +68,8 @@ Lifting your finger while drawing clears the current trace so you can reposition
 
 Press **Ctrl+T** after drawing to label the gesture for training. The dialog also lets you choose how many random variations to generate for one-shot learning.
 
+When a system tray is available, the desktop app adds a tray icon labeled **Symbol Keyboard** that keeps running after you hide the canvas. Single- or double-click the tray icon (or choose the menu item) to show or hide the window without quitting. Closing the window now hides it in tray mode; use the tray menu’s **Quit** action or the existing keyboard shortcuts (Esc/Ctrl+C) to exit completely. On macOS and Windows the app continues running in the background so you can recall the keyboard later.
+
 ### Configuration
 
 SymbolCast loads command mappings from `config/commands.json` when it starts.
