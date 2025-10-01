@@ -261,10 +261,8 @@ protected:
       m_pressPending = false;
       m_dragging = false;
       finishActiveStrokes();
-      m_strokes.push_back({});
-      m_strokes.back().active = true;
-      m_strokes.back().opacity = 1.f;
-      m_strokes.back().addPoint(event->pos());
+      auto &stroke = startStroke();
+      stroke.addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       m_label->hide();
       SC_LOG(sc::LogLevel::Info, "Sequence start");
@@ -285,12 +283,12 @@ protected:
       SC_LOG(sc::LogLevel::Info, "Record stream" );
     } else if (nowCapturing) {
       if (m_strokes.empty())
-        m_strokes.push_back({});
-      if (!m_strokes.back().active) {
+        startStroke();
+      if (!m_strokes.back().isActive) {
         finishActiveStrokes();
-        m_strokes.back().active = true;
-        m_strokes.back().opacity = 1.f;
+        m_strokes.back().isActive = true;
       }
+      m_strokes.back().opacity = 1.f;
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       m_label->hide();
@@ -354,12 +352,12 @@ protected:
     }
     if (m_input.capturing()) {
       if (m_strokes.empty())
-        m_strokes.push_back({});
-      if (!m_strokes.back().active) {
+        startStroke();
+      if (!m_strokes.back().isActive) {
         finishActiveStrokes();
-        m_strokes.back().active = true;
-        m_strokes.back().opacity = 1.f;
+        m_strokes.back().isActive = true;
       }
+      m_strokes.back().opacity = 1.f;
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       if (static_cast<int>(sc::globalLogLevel()) <=
@@ -446,7 +444,7 @@ protected:
       if (s.points.empty())
         continue;
       QColor col = m_options.strokeColor;
-      float strokeOpacity = s.active ? 1.f : s.opacity;
+      float strokeOpacity = s.isActive ? 1.f : s.opacity;
       col.setAlphaF(col.alphaF() * strokeOpacity);
       QPen pen(col, m_options.strokeWidth);
       p.setPen(pen);
@@ -614,12 +612,12 @@ private slots:
         m_cursorTrace.pop_front();
     }
     for (auto &s : m_strokes) {
-      if (!s.active)
-        s.opacity -= m_options.fadeRate;
+      if (!s.isActive)
+        s.opacity = std::max(0.f, s.opacity - m_options.fadeRate);
     }
     m_strokes.erase(std::remove_if(m_strokes.begin(), m_strokes.end(),
                                    [&](const Stroke &s) {
-                                     return !s.active && s.opacity <= 0.f;
+                                     return !s.isActive && s.opacity <= 0.f;
                                    }),
                     m_strokes.end());
     if (m_predictionOpacity > 0.f)
@@ -648,10 +646,17 @@ private:
     m_label->hide();
   }
 
+  Stroke &startStroke() {
+    auto &stroke = m_strokes.emplace_back();
+    stroke.isActive = true;
+    stroke.opacity = 1.f;
+    return stroke;
+  }
+
   void finishActiveStrokes() {
     for (auto &stroke : m_strokes) {
-      if (stroke.active)
-        stroke.active = false;
+      if (stroke.isActive)
+        stroke.isActive = false;
     }
   }
 
@@ -1318,7 +1323,7 @@ private:
     std::vector<QPointF> points;
     QPainterPath path;
     float opacity{1.f};
-    bool active{false};
+    bool isActive{false};
 
     void addPoint(const QPointF &p) {
       points.push_back(p);
