@@ -12,9 +12,13 @@
 #include <QStyle>
 #include <QSystemTrayIcon>
 #include <QString>
+#include <functional>
+#include <utility>
 #include "utils/Logger.hpp"
 
 #ifdef Q_OS_MAC
+#include <CoreFoundation/CoreFoundation.h>
+#include <dispatch/dispatch.h>
 #include <objc/message.h>
 #include <objc/objc.h>
 #include <objc/runtime.h>
@@ -30,6 +34,36 @@ QIcon trayIconForApp(const QApplication &app) {
 }
 
 #ifdef Q_OS_MAC
+namespace {
+std::function<void()> gPresentWindowHandler;
+void *const kMacServiceObserver = reinterpret_cast<void *>(1);
+
+void runPresentWindow(void *) {
+    if (gPresentWindowHandler)
+        gPresentWindowHandler();
+}
+
+void macServiceNotification(CFNotificationCenterRef, void *, CFStringRef, const void *, CFDictionaryRef) {
+    if (gPresentWindowHandler)
+        dispatch_async_f(dispatch_get_main_queue(), nullptr, runPresentWindow);
+}
+} // namespace
+
+void registerMacServiceHandler(std::function<void()> handler) {
+    gPresentWindowHandler = std::move(handler);
+    CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
+    CFNotificationCenterRemoveObserver(center,
+                                       kMacServiceObserver,
+                                       CFSTR("com.symbolcast.desktop.presentWindow"),
+                                       nullptr);
+    CFNotificationCenterAddObserver(center,
+                                    kMacServiceObserver,
+                                    macServiceNotification,
+                                    CFSTR("com.symbolcast.desktop.presentWindow"),
+                                    nullptr,
+                                    CFNotificationSuspensionBehaviorDeliverImmediately);
+}
+
 void activateMacApplication() {
     Class nsAppClass = objc_getClass("NSApplication");
     if (!nsAppClass)
@@ -115,6 +149,16 @@ int main(int argc, char** argv) {
         activateMacApplication();
 #endif
     };
+
+#ifdef Q_OS_MAC
+    registerMacServiceHandler(presentWindow);
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
+        CFNotificationCenterRemoveObserver(CFNotificationCenterGetDistributedCenter(),
+                                           kMacServiceObserver,
+                                           CFSTR("com.symbolcast.desktop.presentWindow"),
+                                           nullptr);
+    });
+#endif
 
     const bool trayAvailable = QSystemTrayIcon::isSystemTrayAvailable();
 #if defined(Q_OS_WIN) || defined(Q_OS_MAC)

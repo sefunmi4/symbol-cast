@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.14)
 project(SymbolCast LANGUAGES CXX)
 
+if(APPLE)
+  enable_language(OBJC)
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.14" CACHE STRING "Minimum macOS version")
+  endif()
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -47,14 +54,45 @@ if(QT_FOUND)
   set(CMAKE_AUTOMOC ON)
   find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets)
 
-  add_executable(symbolcast-desktop
+  set(symbolcast_desktop_sources
       apps/desktop/main.cpp
       apps/desktop/CanvasWindow.hpp)
+
+  if(APPLE)
+    set(MACOSX_BUNDLE_BUNDLE_NAME "SymbolCast")
+    set(MACOSX_BUNDLE_GUI_IDENTIFIER "com.symbolcast.desktop")
+    set(MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0")
+    set(MACOSX_BUNDLE_BUNDLE_VERSION "1.0")
+    set(MACOSX_BUNDLE_EXECUTABLE_NAME "symbolcast-desktop")
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/apps/desktop/Info.plist.in
+                   ${CMAKE_CURRENT_BINARY_DIR}/symbolcast-desktop-Info.plist @ONLY)
+  endif()
+
+  add_executable(symbolcast-desktop
+      MACOSX_BUNDLE
+      ${symbolcast_desktop_sources})
   target_link_libraries(symbolcast-desktop PRIVATE
       symbolcast_core
       Qt${QT_VERSION_MAJOR}::Core
       Qt${QT_VERSION_MAJOR}::Gui
       Qt${QT_VERSION_MAJOR}::Widgets)
+  if(APPLE)
+    set_target_properties(symbolcast-desktop PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_BINARY_DIR}/symbolcast-desktop-Info.plist)
+  endif()
+
+  if(APPLE)
+    add_executable(symbolcast-service-macos
+        MACOSX_BUNDLE
+        os/service-macos/main.m
+        os/service-macos/ServiceDelegate.m
+        os/service-macos/ServiceDelegate.h)
+    set_target_properties(symbolcast-service-macos PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/os/service-macos/Info.plist
+        OUTPUT_NAME symbolcast-service-macos)
+    target_link_libraries(symbolcast-service-macos PRIVATE "-framework Cocoa")
+    add_dependencies(symbolcast-desktop symbolcast-service-macos)
+  endif()
   if(SC_ENABLE_TROCR)
     target_link_libraries(symbolcast-desktop PRIVATE ${TORCH_LIBRARIES} ${TOKENIZERS_LIBRARY})
     add_executable(symbolcast-trocr-infer
