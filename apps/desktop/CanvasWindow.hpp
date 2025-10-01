@@ -1,10 +1,12 @@
 #ifndef CANVASWINDOW_HPP
 #define CANVASWINDOW_HPP
 #include "core/input/InputManager.hpp"
+#include "core/plugins/PluginManager.hpp"
 #include "core/recognition/ModelRunner.hpp"
 #include "core/recognition/RecognizerRouter.hpp"
 #include "core/recognition/GestureRecognizer.hpp"
 #include "core/recognition/TrocrDecoder.hpp"
+#include "utils/SymbolicParser.hpp"
 #include "utils/Logger.hpp"
 #include <QCoreApplication>
 #include <QClipboard>
@@ -39,6 +41,13 @@
 #include <QSignalBlocker>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QTabWidget>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QPlainTextEdit>
+#include <QStringList>
+#include <QVector>
+#include <QSet>
 #include <QString>
 #include <QTransform>
 #include <QWidget>
@@ -178,9 +187,20 @@ public:
     setupSettingsMenu();
     updateMacroPanelGeometry();
     updateSettingsButtonGeometry();
+    setupTabs();
+    QDir pluginDir(QStringLiteral("data/plugins"));
+    pluginDir.mkpath(QStringLiteral("."));
+    m_pluginManager.loadFromDirectory(pluginDir);
+    refreshSymbolsTab();
+    refreshPluginsTab();
+    rebuildPluginShortcuts();
+    updateTabWidgetGeometry();
   }
 
   void setHideOnClose(bool hide) { m_hideOnClose = hide; }
+
+  const sc::PluginManager &pluginManager() const { return m_pluginManager; }
+  void invokePlugin(const QString &id);
 
   struct Ripple {
     QPointF pos;
@@ -203,6 +223,8 @@ public:
 
 signals:
   void visibilityChanged(bool visible);
+  void pluginsChanged();
+  void pluginInvoked(const QString &id);
 
 protected:
   void closeEvent(QCloseEvent *event) override {
@@ -225,7 +247,8 @@ protected:
   }
 
   void mousePressEvent(QMouseEvent *event) override {
-    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
+    if (isTabRegion(event->pos()) || isMacroRegion(event->pos()) ||
+        isSettingsRegion(event->pos())) {
       resetIdleTimer();
       QWidget::mousePressEvent(event);
       return;
@@ -311,6 +334,11 @@ protected:
       setGeometry(r);
       return;
     }
+    if (isTabRegion(event->pos())) {
+      resetIdleTimer();
+      QWidget::mouseMoveEvent(event);
+      return;
+    }
     if (m_dragging) {
       move(event->globalPos() - m_dragPos);
       return;
@@ -372,7 +400,8 @@ protected:
     update();
   }
   void mouseReleaseEvent(QMouseEvent *event) override {
-    if (isMacroRegion(event->pos()) || isSettingsRegion(event->pos())) {
+    if (isTabRegion(event->pos()) || isMacroRegion(event->pos()) ||
+        isSettingsRegion(event->pos())) {
       QWidget::mouseReleaseEvent(event);
       resetIdleTimer();
       return;
@@ -393,6 +422,7 @@ protected:
     m_label->setGeometry(rect());
     updateMacroPanelGeometry();
     updateSettingsButtonGeometry();
+    updateTabWidgetGeometry();
   }
   void paintEvent(QPaintEvent *) override {
     QPainter p(this);
@@ -550,6 +580,22 @@ private slots:
       SC_LOG(sc::LogLevel::Info,
              std::string("Detected symbol: <none>, action: <none>"));
     }
+
+    if (m_tabWidget && m_tabWidget->currentWidget() == m_equationTab) {
+      QString equationToken;
+      if (!trocrGlyph.isEmpty())
+        equationToken = trocrGlyph;
+      else if (!emittedGlyph.isEmpty())
+        equationToken = emittedGlyph;
+      else if (!recognizedSymbol.empty())
+        equationToken = QString::fromStdString(recognizedSymbol);
+      if (!equationToken.isEmpty())
+        appendEquationToken(equationToken);
+    } else {
+      if (!m_equationState.tokens.isEmpty())
+        clearEquationState(false);
+    }
+
     resetRecognitionState();
     m_idleTimer->start();
     update();
@@ -799,6 +845,307 @@ private:
     updateMacroPanelVisibilityAction();
   }
 
+  void setupTabs() {
+    if (m_tabWidget)
+      return;
+    m_tabWidget = new QTabWidget(this);
+    m_tabWidget->setCursor(Qt::ArrowCursor);
+    m_tabWidget->setAttribute(Qt::WA_StyledBackground, true);
+    m_tabWidget->setStyleSheet(
+        "QTabWidget::pane { background:rgba(0,0,0,120); border-radius:10px; }"
+        "QTabBar::tab { background:rgba(255,255,255,25); color:#FFFFFF; padding:4px 12px; margin:2px; border-radius:6px; }"
+        "QTabBar::tab:selected { background:rgba(255,255,255,60); }");
+    m_tabWidget->raise();
+
+    m_symbolsTab = new QWidget(m_tabWidget);
+    auto *symbolsLayout = new QVBoxLayout(m_symbolsTab);
+    symbolsLayout->setContentsMargins(8, 8, 8, 8);
+    symbolsLayout->setSpacing(6);
+    auto *symbolsLabel = new QLabel(tr("Gesture bindings"), m_symbolsTab);
+    symbolsLabel->setStyleSheet("color:#FFFFFF;font-size:11px;");
+    symbolsLayout->addWidget(symbolsLabel);
+    m_symbolList = new QListWidget(m_symbolsTab);
+    m_symbolList->setStyleSheet(
+        "QListWidget { background:rgba(0,0,0,60); border:1px solid rgba(255,255,255,30);"
+        "color:#FFFFFF; } QListWidget::item { padding:4px; }");
+    m_symbolList->setCursor(Qt::ArrowCursor);
+    symbolsLayout->addWidget(m_symbolList, 1);
+    m_tabWidget->addTab(m_symbolsTab, tr("Symbols"));
+
+    m_equationTab = new QWidget(m_tabWidget);
+    auto *equationLayout = new QVBoxLayout(m_equationTab);
+    equationLayout->setContentsMargins(8, 8, 8, 8);
+    equationLayout->setSpacing(6);
+    m_equationExpressionLabel =
+        new QLabel(tr("Draw an equation to begin"), m_equationTab);
+    m_equationExpressionLabel->setStyleSheet("color:#FFFFFF;font-size:11px;");
+    equationLayout->addWidget(m_equationExpressionLabel);
+    auto *latexLabel = new QLabel(tr("LaTeX"), m_equationTab);
+    latexLabel->setStyleSheet("color:#DDDDDD;font-size:10px;");
+    equationLayout->addWidget(latexLabel);
+    m_equationLatexEdit = new QPlainTextEdit(m_equationTab);
+    m_equationLatexEdit->setReadOnly(true);
+    m_equationLatexEdit->setFixedHeight(48);
+    m_equationLatexEdit->setStyleSheet(
+        "QPlainTextEdit { background:rgba(0,0,0,60); color:#FFFFFF; border:1px solid rgba(255,255,255,25); }");
+    equationLayout->addWidget(m_equationLatexEdit);
+    auto *codeLabel = new QLabel(tr("Code"), m_equationTab);
+    codeLabel->setStyleSheet("color:#DDDDDD;font-size:10px;");
+    equationLayout->addWidget(codeLabel);
+    m_equationCodeEdit = new QPlainTextEdit(m_equationTab);
+    m_equationCodeEdit->setReadOnly(true);
+    m_equationCodeEdit->setFixedHeight(72);
+    m_equationCodeEdit->setStyleSheet(
+        "QPlainTextEdit { background:rgba(0,0,0,60); color:#FFFFFF; border:1px solid rgba(255,255,255,25); }");
+    equationLayout->addWidget(m_equationCodeEdit);
+    auto *buttonRow = new QHBoxLayout();
+    buttonRow->setSpacing(6);
+    m_equationClearButton = new QPushButton(tr("Clear"), m_equationTab);
+    m_equationClearButton->setCursor(Qt::ArrowCursor);
+    buttonRow->addWidget(m_equationClearButton);
+    m_equationGenerateButton =
+        new QPushButton(tr("Create Plugin"), m_equationTab);
+    m_equationGenerateButton->setCursor(Qt::ArrowCursor);
+    m_equationGenerateButton->setEnabled(false);
+    buttonRow->addWidget(m_equationGenerateButton);
+    equationLayout->addLayout(buttonRow);
+    connect(m_equationClearButton, &QPushButton::clicked, this,
+            [this]() { clearEquationState(); });
+    connect(m_equationGenerateButton, &QPushButton::clicked, this,
+            [this]() { generateEquationPlugin(); });
+    m_tabWidget->addTab(m_equationTab, tr("Equation"));
+
+    m_pluginsTab = new QWidget(m_tabWidget);
+    auto *pluginsLayout = new QVBoxLayout(m_pluginsTab);
+    pluginsLayout->setContentsMargins(8, 8, 8, 8);
+    pluginsLayout->setSpacing(6);
+    auto *pluginsLabel = new QLabel(tr("Available plugins"), m_pluginsTab);
+    pluginsLabel->setStyleSheet("color:#FFFFFF;font-size:11px;");
+    pluginsLayout->addWidget(pluginsLabel);
+    m_pluginList = new QListWidget(m_pluginsTab);
+    m_pluginList->setCursor(Qt::ArrowCursor);
+    m_pluginList->setStyleSheet(
+        "QListWidget { background:rgba(0,0,0,60); border:1px solid rgba(255,255,255,25);"
+        "color:#FFFFFF; } QListWidget::item { padding:4px; }");
+    pluginsLayout->addWidget(m_pluginList, 1);
+    connect(m_pluginList, &QListWidget::itemActivated, this,
+            [this](QListWidgetItem *item) { handlePluginActivation(item); });
+    m_tabWidget->addTab(m_pluginsTab, tr("Plugins"));
+
+    connect(m_tabWidget, &QTabWidget::currentChanged, this,
+            [this](int index) {
+              if (m_tabWidget->widget(index) == m_equationTab)
+                updateEquationUi();
+            });
+  }
+
+  void refreshSymbolsTab() {
+    if (!m_symbolList)
+      return;
+    QSignalBlocker blocker(m_symbolList);
+    m_symbolList->clear();
+    if (m_macroBindings.empty()) {
+      auto *item = new QListWidgetItem(tr("No command bindings configured."),
+                                       m_symbolList);
+      item->setFlags(Qt::NoItemFlags);
+      return;
+    }
+    QStringList symbols;
+    symbols.reserve(static_cast<int>(m_macroBindings.size()));
+    for (const auto &entry : m_macroBindings)
+      symbols.push_back(QString::fromStdString(entry.first));
+    std::sort(symbols.begin(), symbols.end(), [](const QString &a, const QString &b) {
+      return a.localeAwareCompare(b) < 0;
+    });
+    for (const QString &symbol : symbols) {
+      const auto it = m_macroBindings.find(symbol.toStdString());
+      if (it == m_macroBindings.end())
+        continue;
+      const MacroBinding &binding = it->second;
+      QString text = symbol;
+      if (!binding.commandDisplay.isEmpty())
+        text += QStringLiteral(" → %1").arg(binding.commandDisplay);
+      if (!binding.output.isEmpty())
+        text += QStringLiteral(" (%1)").arg(binding.output);
+      auto *item = new QListWidgetItem(text, m_symbolList);
+      item->setData(Qt::UserRole, symbol);
+    }
+  }
+
+  void refreshPluginsTab() {
+    if (!m_pluginList)
+      return;
+    QSignalBlocker blocker(m_pluginList);
+    m_pluginList->clear();
+    const auto manifests = m_pluginManager.manifests();
+    if (manifests.isEmpty()) {
+      auto *item = new QListWidgetItem(tr("No plugins available"), m_pluginList);
+      item->setFlags(Qt::NoItemFlags);
+      return;
+    }
+    for (const auto &manifest : manifests) {
+      QString text = manifest.name;
+      if (!manifest.shortcuts.isEmpty())
+        text += QStringLiteral(" (%1)").arg(manifest.shortcuts.join(", "));
+      if (!manifest.expression.isEmpty())
+        text += QStringLiteral(" • %1").arg(manifest.expression);
+      auto *item = new QListWidgetItem(text, m_pluginList);
+      item->setData(Qt::UserRole, manifest.id);
+      if (!manifest.description.isEmpty())
+        item->setToolTip(manifest.description);
+    }
+  }
+
+  void updateTabWidgetGeometry() {
+    if (!m_tabWidget)
+      return;
+    int margin = 16;
+    int availableHeight = height();
+    int tabHeight = std::clamp(availableHeight / 3, 160, 260);
+    int tabWidth = std::max(width() - margin * 2, 280);
+    int x = margin;
+    int y = std::max(margin, height() - tabHeight - margin);
+    m_tabWidget->setGeometry(x, y, tabWidth, tabHeight);
+    m_tabWidget->raise();
+  }
+
+  void rebuildPluginShortcuts() {
+    for (QShortcut *shortcut : m_pluginShortcuts) {
+      if (!shortcut)
+        continue;
+      shortcut->disconnect(this);
+      shortcut->setParent(nullptr);
+      delete shortcut;
+    }
+    m_pluginShortcuts.clear();
+    const auto manifests = m_pluginManager.manifests();
+    for (const auto &manifest : manifests) {
+      for (const QString &shortcutText : manifest.shortcuts) {
+        QKeySequence seq(shortcutText);
+        if (seq.isEmpty())
+          continue;
+        auto *shortcut = new QShortcut(seq, this);
+        shortcut->setContext(Qt::ApplicationShortcut);
+        connect(shortcut, &QShortcut::activated, this,
+                [this, id = manifest.id]() { invokePlugin(id); });
+        m_pluginShortcuts.push_back(shortcut);
+      }
+    }
+  }
+
+  void appendEquationToken(const QString &token) {
+    if (token.isEmpty())
+      return;
+    m_equationState.tokens.push_back(token);
+    processEquationState();
+  }
+
+  void processEquationState() {
+    if (m_equationState.tokens.isEmpty()) {
+      updateEquationUi();
+      return;
+    }
+    m_equationState.expression = m_equationState.tokens.join(QString());
+    sc::SymbolicParser::Result parsed =
+        m_symbolicParser.parse(m_equationState.expression);
+    m_equationState.normalized = parsed.normalized;
+    m_equationState.latex = parsed.latex;
+    m_equationState.code = parsed.code;
+    m_equationState.variables = parsed.variables;
+    updateEquationUi();
+  }
+
+  void updateEquationUi() {
+    if (!m_equationExpressionLabel)
+      return;
+    if (m_equationState.tokens.isEmpty()) {
+      m_equationExpressionLabel->setText(
+          tr("Draw an equation to begin"));
+    } else {
+      m_equationExpressionLabel->setText(
+          tr("Captured: %1").arg(m_equationState.expression));
+    }
+    if (m_equationLatexEdit)
+      m_equationLatexEdit->setPlainText(m_equationState.latex);
+    if (m_equationCodeEdit)
+      m_equationCodeEdit->setPlainText(m_equationState.code);
+    if (m_equationGenerateButton)
+      m_equationGenerateButton->setEnabled(!m_equationState.code.isEmpty());
+  }
+
+  void clearEquationState(bool notify = true) {
+    m_equationState = EquationState();
+    updateEquationUi();
+    if (notify)
+      showHoverFeedback(tr("Equation buffer cleared"));
+  }
+
+  QString nextPluginShortcut() const {
+    QSet<QString> existing;
+    const auto manifests = m_pluginManager.manifests();
+    for (const auto &manifest : manifests) {
+      for (const QString &shortcut : manifest.shortcuts) {
+        QKeySequence seq(shortcut);
+        if (!seq.isEmpty())
+          existing.insert(seq.toString(QKeySequence::PortableText));
+      }
+    }
+    for (int i = 1; i <= 9; ++i) {
+      QString candidate = QStringLiteral("Ctrl+Alt+%1").arg(i);
+      QKeySequence seq(candidate);
+      if (!existing.contains(seq.toString(QKeySequence::PortableText)))
+        return candidate;
+    }
+    return QString();
+  }
+
+  void generateEquationPlugin() {
+    if (m_equationState.expression.isEmpty() || m_equationState.code.isEmpty()) {
+      showHoverFeedback(tr("No equation captured"));
+      return;
+    }
+    sc::PluginManager::Manifest manifest;
+    manifest.id =
+        QStringLiteral("equation_%1")
+            .arg(QDateTime::currentDateTimeUtc().toMSecsSinceEpoch());
+    manifest.name = tr("Equation %1").arg(m_equationState.expression);
+    manifest.description =
+        tr("Generated from equation %1").arg(m_equationState.expression);
+    manifest.trigger = QStringLiteral("equation");
+    manifest.expression = m_equationState.expression;
+    manifest.latex = m_equationState.latex;
+    manifest.code = m_equationState.code;
+    manifest.entry = m_equationState.code;
+    manifest.language = QStringLiteral("python");
+    manifest.action = QStringLiteral("clipboard");
+    manifest.createdAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+    if (!m_equationState.variables.isEmpty()) {
+      manifest.description +=
+          tr(" · variables: %1").arg(m_equationState.variables.join(", "));
+    }
+    QString shortcut = nextPluginShortcut();
+    if (!shortcut.isEmpty())
+      manifest.shortcuts = QStringList{shortcut};
+    QString savedPath;
+    if (!m_pluginManager.saveManifest(manifest, &savedPath)) {
+      showHoverFeedback(tr("Failed to save plugin"));
+      return;
+    }
+    refreshPluginsTab();
+    rebuildPluginShortcuts();
+    emit pluginsChanged();
+    showHoverFeedback(tr("Plugin saved: %1").arg(manifest.name));
+  }
+
+  void handlePluginActivation(QListWidgetItem *item) {
+    if (!item)
+      return;
+    const QString pluginId = item->data(Qt::UserRole).toString();
+    if (pluginId.isEmpty())
+      return;
+    invokePlugin(pluginId);
+  }
+
   void updateSettingsButtonGeometry() {
     if (!m_settingsButton)
       return;
@@ -897,6 +1244,7 @@ private:
                                               : binding.output;
       it->second.glyphLabel->setText(text);
     }
+    refreshSymbolsTab();
     if (persist)
       saveMacroBindings();
   }
@@ -1304,6 +1652,32 @@ private:
     return true;
   }
 
+  void invokePlugin(const QString &id) {
+    auto manifest = m_pluginManager.manifestForId(id);
+    if (!manifest)
+      return;
+    QString payload = manifest->code.isEmpty() ? manifest->entry : manifest->code;
+    QString action = manifest->action.isEmpty()
+                         ? QStringLiteral("clipboard")
+                         : manifest->action;
+    if (action == QStringLiteral("clipboard")) {
+      if (!payload.isEmpty()) {
+        if (QClipboard *clipboard = QGuiApplication::clipboard())
+          clipboard->setText(payload);
+        showHoverFeedback(tr("Plugin %1 copied to clipboard")
+                              .arg(manifest->name));
+      }
+    } else {
+      showHoverFeedback(tr("Plugin %1 ready").arg(manifest->name));
+    }
+    emit pluginInvoked(id);
+  }
+
+  bool isTabRegion(const QPoint &pos) const {
+    return m_tabWidget && m_tabWidget->isVisible() &&
+           m_tabWidget->geometry().contains(pos);
+  }
+
   bool isMacroRegion(const QPoint &pos) const {
     return m_macroPanel && m_macroPanel->isVisible() &&
            m_macroPanel->geometry().contains(pos);
@@ -1380,6 +1754,28 @@ private:
   QToolButton *m_settingsButton{nullptr};
   QMenu *m_settingsMenu{nullptr};
   QAction *m_macroPanelAction{nullptr};
+  QTabWidget *m_tabWidget{nullptr};
+  QWidget *m_symbolsTab{nullptr};
+  QWidget *m_equationTab{nullptr};
+  QWidget *m_pluginsTab{nullptr};
+  QListWidget *m_symbolList{nullptr};
+  QListWidget *m_pluginList{nullptr};
+  QLabel *m_equationExpressionLabel{nullptr};
+  QPlainTextEdit *m_equationLatexEdit{nullptr};
+  QPlainTextEdit *m_equationCodeEdit{nullptr};
+  QPushButton *m_equationGenerateButton{nullptr};
+  QPushButton *m_equationClearButton{nullptr};
+  QVector<QShortcut *> m_pluginShortcuts;
+  sc::PluginManager m_pluginManager;
+  sc::SymbolicParser m_symbolicParser;
+  struct EquationState {
+    QStringList tokens;
+    QString expression;
+    QString normalized;
+    QString latex;
+    QString code;
+    QStringList variables;
+  } m_equationState;
   std::unordered_map<std::string, MacroUIRow> m_macroRows;
   std::unordered_map<std::string, MacroBinding> m_macroBindings;
 #ifdef SC_ENABLE_TROCR

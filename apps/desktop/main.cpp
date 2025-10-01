@@ -177,6 +177,27 @@ int main(int argc, char** argv) {
         QAction *toggleAction = trayMenu->addAction(QObject::tr("Symbol Keyboard"));
         toggleAction->setCheckable(true);
         QAction *quitAction = trayMenu->addAction(QObject::tr("Quit"));
+        QMenu *pluginsMenu = trayMenu->addMenu(QObject::tr("Plugins"));
+        auto rebuildPluginsMenu = [&]() {
+            pluginsMenu->clear();
+            const auto manifests = win.pluginManager().manifests();
+            if (manifests.isEmpty()) {
+                QAction *empty = pluginsMenu->addAction(QObject::tr("No plugins available"));
+                empty->setEnabled(false);
+                return;
+            }
+            for (const auto &manifest : manifests) {
+                QString text = manifest.name;
+                if (!manifest.shortcuts.isEmpty())
+                    text += QStringLiteral(" (%1)").arg(manifest.shortcuts.join(", "));
+                QAction *pluginAction = pluginsMenu->addAction(text);
+                if (!manifest.description.isEmpty())
+                    pluginAction->setToolTip(manifest.description);
+                QObject::connect(pluginAction, &QAction::triggered, &win,
+                                 [&, manifest]() { win.invokePlugin(manifest.id); });
+            }
+        };
+        rebuildPluginsMenu();
         trayIcon->setContextMenu(trayMenu);
 
         win.setHideOnClose(true);
@@ -199,6 +220,9 @@ int main(int argc, char** argv) {
                              QSignalBlocker blocker(toggleAction);
                              toggleAction->setChecked(visible);
                          });
+
+        QObject::connect(&win, &CanvasWindow::pluginsChanged, pluginsMenu,
+                         [&, pluginsMenu]() { rebuildPluginsMenu(); });
 
         QObject::connect(trayIcon, &QSystemTrayIcon::activated, &win,
                          [&, trayMenu](QSystemTrayIcon::ActivationReason reason) {
