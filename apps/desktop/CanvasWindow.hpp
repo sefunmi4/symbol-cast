@@ -260,24 +260,23 @@ protected:
     if (act == sc::TapAction::StartSequence) {
       m_pressPending = false;
       m_dragging = false;
-      m_strokes.clear();
+      finishActiveStrokes();
       m_strokes.push_back({});
+      m_strokes.back().active = true;
+      m_strokes.back().opacity = 1.f;
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       m_label->hide();
       SC_LOG(sc::LogLevel::Info, "Sequence start");
       updatePrediction();
     } else if (act == sc::TapAction::EndSequence) {
+      finishActiveStrokes();
       onSubmit();
-      m_input.clear();
-      m_strokes.clear();
       m_label->show();
       SC_LOG(sc::LogLevel::Info, "Sequence end");
     } else if (act == sc::TapAction::ResetDrawing) {
-      m_input.clear();
-      m_strokes.clear();
-      m_predictionPath = QPainterPath();
-      m_detectionRect = QRectF();
+      finishActiveStrokes();
+      resetRecognitionState();
       m_label->show();
       updatePrediction();
     } else if (act == sc::TapAction::LabelSymbol) {
@@ -287,6 +286,11 @@ protected:
     } else if (nowCapturing) {
       if (m_strokes.empty())
         m_strokes.push_back({});
+      if (!m_strokes.back().active) {
+        finishActiveStrokes();
+        m_strokes.back().active = true;
+        m_strokes.back().opacity = 1.f;
+      }
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       m_label->hide();
@@ -351,6 +355,11 @@ protected:
     if (m_input.capturing()) {
       if (m_strokes.empty())
         m_strokes.push_back({});
+      if (!m_strokes.back().active) {
+        finishActiveStrokes();
+        m_strokes.back().active = true;
+        m_strokes.back().opacity = 1.f;
+      }
       m_strokes.back().addPoint(event->pos());
       m_input.addPoint(event->pos().x(), event->pos().y());
       if (static_cast<int>(sc::globalLogLevel()) <=
@@ -437,7 +446,8 @@ protected:
       if (s.points.empty())
         continue;
       QColor col = m_options.strokeColor;
-      col.setAlphaF(col.alphaF() * s.opacity);
+      float strokeOpacity = s.active ? 1.f : s.opacity;
+      col.setAlphaF(col.alphaF() * strokeOpacity);
       QPen pen(col, m_options.strokeWidth);
       p.setPen(pen);
       if (s.path.isEmpty()) {
@@ -542,8 +552,7 @@ private slots:
       SC_LOG(sc::LogLevel::Info,
              std::string("Detected symbol: <none>, action: <none>"));
     }
-    m_input.clear();
-    m_detectionRect = QRectF();
+    resetRecognitionState();
     m_idleTimer->start();
     update();
   }
@@ -582,10 +591,8 @@ private slots:
     }
 
     m_recognizer.saveProfile("data/user_gestures.json");
-    m_input.clear();
-    m_strokes.clear();
-    m_predictionPath = QPainterPath();
-    m_detectionRect = QRectF();
+    finishActiveStrokes();
+    resetRecognitionState();
     update();
   }
   void onFrame() {
@@ -606,11 +613,13 @@ private slots:
       while (!m_cursorTrace.empty() && m_cursorTrace.front().life <= 0.f)
         m_cursorTrace.pop_front();
     }
-    for (auto &s : m_strokes)
-      s.opacity -= m_options.fadeRate;
+    for (auto &s : m_strokes) {
+      if (!s.active)
+        s.opacity -= m_options.fadeRate;
+    }
     m_strokes.erase(std::remove_if(m_strokes.begin(), m_strokes.end(),
                                    [&](const Stroke &s) {
-                                     return s.opacity <= 0.f;
+                                     return !s.active && s.opacity <= 0.f;
                                    }),
                     m_strokes.end());
     if (m_predictionOpacity > 0.f)
@@ -637,6 +646,20 @@ private:
     m_idleTimer->stop();
     m_idleTimer->start();
     m_label->hide();
+  }
+
+  void finishActiveStrokes() {
+    for (auto &stroke : m_strokes) {
+      if (stroke.active)
+        stroke.active = false;
+    }
+  }
+
+  void resetRecognitionState() {
+    m_input.clear();
+    m_predictionPath = QPainterPath();
+    m_predictionOpacity = 0.f;
+    m_detectionRect = QRectF();
   }
 
   int edgesForPos(const QPoint &p) const {
@@ -1295,6 +1318,7 @@ private:
     std::vector<QPointF> points;
     QPainterPath path;
     float opacity{1.f};
+    bool active{false};
 
     void addPoint(const QPointF &p) {
       points.push_back(p);
