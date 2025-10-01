@@ -70,6 +70,16 @@ Press **Ctrl+T** after drawing to label the gesture for training. The dialog als
 
 When a system tray is available, the desktop app adds a tray icon labeled **Symbol Keyboard** that keeps running after you hide the canvas. Single- or double-click the tray icon (or choose the menu item) to show or hide the window without quitting. Closing the window now hides it in tray mode; use the tray menu’s **Quit** action or the existing keyboard shortcuts (Esc/Ctrl+C) to exit completely. On macOS and Windows the app continues running in the background so you can recall the keyboard later.
 
+### 4. Package on macOS
+
+The build generates a background helper bundle (`symbolcast-service-macos.app`) that registers a macOS Service used to resurface the Qt window. After building on macOS, run the packaging helper to assemble a signed `.app` bundle that includes the service inside `Contents/Library/Services/`:
+
+```bash
+./scripts/package_macos_app.sh ./build ./dist "Developer ID Application: Your Name (TEAMID)"
+```
+
+Pass `-` as the signing identity for ad-hoc signing or provide a path to an entitlements file as an optional fourth argument. The resulting `dist/SymbolCast.app` embeds the Service bundle so the “Show SymbolCast Keyboard” entry is available under **Services**.
+
 ### Configuration
 
 SymbolCast loads macro bindings from `config/commands.json` when it starts. Each
